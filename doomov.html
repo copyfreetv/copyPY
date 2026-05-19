@@ -2,36 +2,37 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <title>ระบบดึงข้อมูลจากเว็บไซต์ดูหนัง  2026</title>
+    <title>ระบบดึงข้อมูลจากเว็บไซต์ดูหนัง 2026</title>
     <style>
-        :root { --gold: #ffeb3b; --bg: #0f0f0f; --card: #1e1e1e; --blue: #2196F3; }
+        :root { --gold: #ffeb3b; --bg: #0f0f0f; --card: #1e1e1e; --blue: #2196F3; --green: #4CAF50; }
         body { font-family: 'Tahoma', sans-serif; background: var(--bg); color: #fff; padding: 20px; }
         .container { max-width: 1200px; margin: 0 auto; }
         
         /* ส่วนควบคุมหน้า */
         .control-panel { background: #222; padding: 20px; border-radius: 12px; margin-bottom: 25px; border-top: 4px solid var(--blue); }
-        .input-group { display: flex; gap: 15px; align-items: center; flex-wrap: wrap; }
+        .input-group { display: flex; gap: 15px; align-items: center; flex-wrap: wrap; justify-content: center; }
         input { background: #333; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 6px; width: 80px; text-align: center; }
         
-        .status-box { background: #1a1a1a; padding: 15px; border-radius: 8px; margin-top: 15px; border-left: 5px solid var(--gold); }
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 25px; }
+        .status-box { background: #1a1a1a; padding: 15px; border-radius: 8px; margin-top: 15px; border-left: 5px solid var(--gold); text-align: center; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 25px; margin-top: 20px; }
         
-        .card { background: var(--card); border-radius: 15px; overflow: hidden; border: 1px solid #333; transition: 0.3s; }
-        .card img { width: 100%; height: 220px; object-fit: cover; }
-        .card-body { padding: 15px; }
-        .card-title { font-size: 16px; font-weight: bold; color: var(--gold); margin-bottom: 8px; }
+        .card { background: var(--card); border-radius: 15px; overflow: hidden; border: 1px solid #333; transition: 0.3s; display: flex; flex-direction: column; }
+        .card img { width: 100%; height: 240px; object-fit: cover; background: #2a2a2a; }
+        .card-body { padding: 15px; text-align: center; flex-grow: 1; display: flex; flex-direction: column; justify-content: space-between; }
+        .card-title { font-size: 15px; font-weight: bold; color: var(--gold); margin-bottom: 8px; min-height: 44px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         
         button.start-btn { background: var(--blue); color: white; padding: 10px 25px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
-        button.view-btn { background: #444; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; width: 100%; margin-top: 10px; }
+        button.view-btn { background: #333; color: white; border: 1px solid #555; padding: 8px; border-radius: 4px; cursor: pointer; width: 100%; margin-top: 10px; font-size: 12px; }
+        button.copy-btn { background: var(--green); color: white; border: none; padding: 6px; border-radius: 4px; cursor: pointer; width: 100%; margin-top: 5px; font-size: 11px; font-weight: bold; display: none; }
         
-        pre { background: #000; color: #00ff41; padding: 10px; font-size: 11px; overflow-x: auto; max-height: 200px; display: none; border-radius: 5px; }
-        .badge { background: var(--blue); padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-bottom: 5px; display: inline-block; }
+        pre { background: #000; color: #00ff41; padding: 10px; font-size: 11px; overflow-x: auto; max-height: 150px; display: none; border-radius: 5px; text-align: left; white-space: pre-wrap; word-break: break-all; margin-top: 8px; }
+        .badge { background: var(--blue); padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-bottom: 8px; display: inline-block; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1 style="text-align:center; color: var(--gold);">สคริปต์ ดึงข้อมูลจาก API ทั้งหมดมี 73 หน้า  Multi-Page 1-73</h1>
+    <h1 style="text-align:center; color: var(--gold);">สคริปต์ ดึงข้อมูลหนังออนไลน์เดี่ยว ปี 2026</h1>
     
     <div class="control-panel">
         <div class="input-group">
@@ -39,11 +40,11 @@
             <input type="number" id="startPage" value="1" min="1">
             <label>ถึงหน้า:</label>
             <input type="number" id="endPage" value="1" min="1">
-            <button class="start-btn" onclick="startHarvesting()">🚀 เริ่มดึงข้อมูล</button>
+            <button class="start-btn" onclick="startHarvesting()">🚀 เริ่มดึงข้อมูลหนัง</button>
         </div>
         
         <div class="status-box">
-            <div id="loader">📍 พร้อมสำหรับการดึงข้อมูล</div>
+            <div id="loader">📍 พร้อมสำหรับการดึงข้อมูลภาพยนตร์</div>
             <div id="stats" style="color: #888; font-size: 13px; margin-top: 5px;"></div>
         </div>
     </div>
@@ -53,7 +54,7 @@
 
 <script>
 const PROXY = '/api/proxy-k24hd?url=';
-const BASE_CAT = 'https://kubhd24.net/category/%e0%b8%94%e0%b8%b9%e0%b8%ab%e0%b8%99%e0%b8%b1%e0%b8%87%e0%b8%ad%e0%b8%ad%e0%b8%99%e0%b9%84%e0%b8%a5%e0%b8%99%e0%b9%8c-2026/';
+const BASE_CAT = 'https://kubhd24.net/category/%e0%b8%94%e0%b8%b9%e0%b8%ab%e0%b8%99%e0%b8%b1%e0%b8%87%e0%b8%b1%e0%b8%ad%e0%b8%ad%e0%b8%99%e0%b9%84%e0%b8%a5%e0%b8%99%e0%b9%8c-2026/';
 
 async function request(url, isJson = false) {
     try {
@@ -71,19 +72,31 @@ async function getStream(postId) {
     return `https://media.vdohls.com/${match[1].split('/').pop()}/playlist.m3u8`;
 }
 
-async function parseSeries(id) {
+// แก้ไขฟังก์ชันให้แกะข้อมูลแบบ "หนังเดี่ยว" ไม่ใช่ซีรีย์
+async function parseMovie(id) {
     const html = await request(`https://kubhd24.net/movie/${id}/`);
     if (!html) return null;
     const doc = new DOMParser().parseFromString(html, "text/html");
     const title = doc.querySelector("h1")?.textContent.trim() || id;
-    const poster = doc.querySelector("img.wp-post-image")?.getAttribute("data-src") || doc.querySelector("img.wp-post-image")?.src;
-    const epButtons = doc.querySelectorAll("#eplist button.ep");
+    const poster = doc.querySelector("img.wp-post-image")?.getAttribute("data-src") || doc.querySelector("img.wp-post-image")?.src || '';
+    
+    // หาปุ่มขวัญใจ (Add Favorite) เพื่อดึง Post ID ของหนังเรื่องนั้นๆ มาขอลิงก์เล่น
+    const favoriteButton = doc.querySelector("button.add-favorite");
+    const postId = favoriteButton ? favoriteButton.getAttribute("data-post-id") : null;
     
     let episodes = [];
-    for (const btn of epButtons) {
-        const url = await getStream(btn.id);
-        if (url) episodes.push({ title: btn.textContent.trim(), url });
+    if (postId) {
+        const url = await getStream(postId);
+        if (url) episodes.push({ title: "Full Movie", url });
+    } else {
+        // แผนสำรองกรณีใช้ปุ่มเล่นแบบเดี่ยว
+        const playBtn = doc.querySelector("button.ep, .play-btn");
+        if (playBtn && playBtn.id) {
+            const url = await getStream(playBtn.id);
+            if (url) episodes.push({ title: "Full Movie", url });
+        }
     }
+    
     return { title, poster, episodes };
 }
 
@@ -94,59 +107,88 @@ async function startHarvesting() {
     const output = document.getElementById("output");
     const stats = document.getElementById("stats");
 
-    output.innerHTML = ""; // ล้างค่าเก่า
-    let totalSeriesFound = 0;
+    output.innerHTML = ""; 
+    let totalMoviesFound = 0;
 
     for (let p = startPage; p <= endPage; p++) {
         const pageUrl = p === 1 ? BASE_CAT : `${BASE_CAT}page/${p}/`;
-        loader.textContent = `🔍 กำลังสแกนหน้าหมวดหมู่ที่ ${p}...`;
+        loader.textContent = `🔍 กำลังสแกนหน้าหมวดหมู่หนังที่ ${p}...`;
         
         const catHtml = await request(pageUrl);
         if (!catHtml) continue;
 
-        const regex = /href="https:\/\/kubhd24\.net\/series\/([^"\/]+)\//g;
-        const ids = Array.from(new Set([...catHtml.matchAll(regex)].map(m => m[1]))).filter(i => i !== 'series');
+        // แก้ไขให้ตรวจจับลิงก์เฉพาะที่เป็นภาพยนตร์เดี่ยว (/movie/)
+        const regex = /href="https:\/\/kubhd24\.net\/movie\/([^"\/]+)\//g;
+        const ids = Array.from(new Set([...catHtml.matchAll(regex)].map(m => m[1]))).filter(i => i !== 'movie');
         
-        totalSeriesFound += ids.length;
-        stats.textContent = `กำลังจัดการหน้าที่ ${p} (พบใหม่ ${ids.length} เรื่อง / รวมสะสม ${totalSeriesFound} เรื่อง)`;
+        totalMoviesFound += ids.length;
+        stats.textContent = `กำลังจัดการหน้าที่ ${p} (พบหนังใหม่ ${ids.length} เรื่อง / รวมสะสม ${totalMoviesFound} เรื่อง)`;
 
         for (let i = 0; i < ids.length; i++) {
             loader.textContent = `⏳ หน้า ${p} | เรื่องที่ ${i+1}/${ids.length}: ${ids[i]}`;
             
-            const data = await parseSeries(ids[i]);
+            const data = await parseMovie(ids[i]);
             if (data && data.episodes.length > 0) {
                 renderCard(data, p);
             }
         }
     }
-    loader.textContent = `✅ ดึงข้อมูลสำเร็จ! รวมทั้งหมด ${totalSeriesFound} เรื่อง จากหน้า ${startPage}-${endPage}`;
+    loader.textContent = `✅ ดึงข้อมูลหนังสำเร็จ! รวมทั้งหมด ${totalMoviesFound} เรื่อง จากหน้า ${startPage}-${endPage}`;
 }
 
 function renderCard(data, pageNum) {
     let m3u = "#EXTM3U\n";
     data.episodes.forEach(ep => {
-        m3u += `#EXTINF:-1 tvg-logo="${data.poster}" group-title="${data.title}", ${data.title} - ${ep.title}\n${ep.url}\n`;
+        m3u += `#EXTINF:-1 tvg-logo="${data.poster}" group-title="หนังออนไลน์ 2026", ${data.title}\n${ep.url}\n`;
     });
 
     const card = document.createElement("div");
     card.className = "card";
     card.innerHTML = `
-        <img src="${data.poster}">
+        <img src="${data.poster}" alt="Poster">
         <div class="card-body">
-            <span class="badge">หน้า ${pageNum}</span>
-            <div class="card-title">${data.title}</div>
-            <div style="font-size:12px; color:#aaa; margin-bottom:10px;">จำนวน ${data.episodes.length} ตอน</div>
-            <button class="view-btn" onclick="toggleM3U(this)">📂 แสดง M3U Playlist</button>
-            <pre>${m3u}</pre>
+            <div>
+                <span class="badge">หน้า ${pageNum}</span>
+                <div class="card-title">${data.title}</div>
+            </div>
+            <div>
+                <button class="view-btn" onclick="toggleM3U(this)">📂 แสดง M3U Playlist</button>
+                <button class="copy-btn" onclick="copyToClipboard(this)">📋 คัดลอกลิงก์สตรีม</button>
+                <pre>${m3u}</pre>
+            </div>
         </div>
     `;
     document.getElementById("output").appendChild(card);
 }
 
 function toggleM3U(btn) {
-    const pre = btn.nextElementSibling;
-    pre.style.display = (pre.style.display === 'block') ? 'none' : 'block';
-    btn.textContent = (pre.style.display === 'block') ? '✖ ปิด' : '📂 แสดง M3U Playlist';
+    const pre = btn.parentElement.querySelector("pre");
+    const copyBtn = btn.parentElement.querySelector(".copy-btn");
+    if (pre.style.display === 'block') {
+        pre.style.display = 'none';
+        copyBtn.style.display = 'none';
+        btn.textContent = '📂 แสดง M3U Playlist';
+    } else {
+        pre.style.display = 'block';
+        copyBtn.style.display = 'block';
+        btn.textContent = '✖ ปิดหน้าต่าง';
+    }
+}
+
+function copyToClipboard(btn) {
+    const pre = btn.parentElement.querySelector("pre");
+    const lines = pre.textContent.split('\n');
+    const streamUrl = lines[lines.length - 2] || lines[1]; 
+    
+    navigator.clipboard.writeText(streamUrl.trim()).then(() => {
+        const oldText = btn.textContent;
+        btn.textContent = '✅ คัดลอกสำเร็จ!';
+        btn.style.background = '#009688';
+        setTimeout(() => {
+            btn.textContent = oldText;
+            btn.style.background = 'var(--green)';
+        }, 1500);
+    });
 }
 </script>
 </body>
