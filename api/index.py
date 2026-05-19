@@ -18,7 +18,7 @@ app.add_middleware(
 # 🌐 สั่งให้ดึงหน้าแรกจาก public/index.html มาโชว์อัตโนมัติ
 @app.get("/", response_class=HTMLResponse)
 async def read_index():
-    index_path = os.path.join(os.getcwd(), "public", "index.html")
+    index_path = os.path.join(os.getcwd(), "..", "public", "index.html")
     if os.path.exists(index_path):
         with open(index_path, "r", encoding="utf-8") as f:
             return f.read()
