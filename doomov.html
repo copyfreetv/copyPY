@@ -2,13 +2,12 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <title>ระบบดึงข้อมูลจากเว็บไซต์ดูหนัง 2026</title>
+    <title>ระบบดึงข้อมูลภาพยนตร์เดี่ยว 2026</title>
     <style>
         :root { --gold: #ffeb3b; --bg: #0f0f0f; --card: #1e1e1e; --blue: #2196F3; --green: #4CAF50; }
         body { font-family: 'Tahoma', sans-serif; background: var(--bg); color: #fff; padding: 20px; }
         .container { max-width: 1200px; margin: 0 auto; }
         
-        /* ส่วนควบคุมหน้า */
         .control-panel { background: #222; padding: 20px; border-radius: 12px; margin-bottom: 25px; border-top: 4px solid var(--blue); }
         .input-group { display: flex; gap: 15px; align-items: center; flex-wrap: wrap; justify-content: center; }
         input { background: #333; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 6px; width: 80px; text-align: center; }
@@ -54,7 +53,7 @@
 
 <script>
 const PROXY = '/api/proxy-k24hd?url=';
-const BASE_CAT = 'https://kubhd24.net/category/%e0%b8%94%e0%b8%b9%e0%b8%ab%e0%b8%99%e0%b8%b1%e0%b8%87%e0%b8%ad%e0%b8%ad%e0%b8%99%e0%b9%84%e0%b8%a5%e0%b8%99%e0%b9%8c-2026/';
+const BASE_CAT = 'https://kubhd24.net/category/%e0%b8%94%e0%b8%b9%e0%b8%ab%e0%b8%99%e0%b8%b1%e0%b8%87%e0%b8%b1%e0%b8%ad%e0%b8%ad%e0%b8%99%e0%b9%84%e0%b8%a5%e0%b8%99%e0%b9%8c-2026/';
 
 async function request(url, isJson = false) {
     try {
@@ -72,32 +71,26 @@ async function getStream(postId) {
     return `https://media.vdohls.com/${match[1].split('/').pop()}/playlist.m3u8`;
 }
 
-// 🛠️ ปรับปรุงฟังก์ชันแกะหน้าหนังเดี่ยวใหม่ทั้งหมดให้ตรงโครงสร้างเว็บจริง 2026
 async function parseMovie(id) {
     const html = await request(`https://kubhd24.net/movie/${id}/`);
     if (!html) return null;
     const doc = new DOMParser().parseFromString(html, "text/html");
     const title = doc.querySelector("h1")?.textContent.trim() || id;
     
-    // ดึงรูปภาพโปสเตอร์
     const imgEl = doc.querySelector("img.wp-post-image") || doc.querySelector(".poster img");
     const poster = imgEl ? (imgEl.getAttribute("data-src") || imgEl.src) : '';
     
     let postId = null;
 
-    // วิธีที่ 1: ดึงจากกล่อง iframe ตัวเล่นหลักของหน้าหนังเดี่ยว
+    // ค้นหา Post ID จากโครงสร้างต่างๆ ของหน้าหนังเดี่ยว
     const movieIframe = doc.querySelector(".movie-iframe");
-    if (movieIframe) {
-        postId = movieIframe.getAttribute("data-id");
-    }
+    if (movieIframe) postId = movieIframe.getAttribute("data-id");
 
-    // วิธีที่ 2: ดึงจากปุ่มโหวต/ปุ่มถูกใจ (แผนสำรองหากวิธีแรกไม่ได้)
     if (!postId) {
         const favBtn = doc.querySelector("button.add-favorite") || doc.querySelector("[data-post-id]");
         if (favBtn) postId = favBtn.getAttribute("data-post-id");
     }
 
-    // วิธีที่ 3: ดึงจากคลาสระบบผู้เล่นตัวเล่นอื่น ๆ 
     if (!postId) {
         const playerWrapper = doc.querySelector("[id*='player']");
         if (playerWrapper) postId = playerWrapper.getAttribute("data-post-id") || playerWrapper.id.replace(/\D/g, "");
@@ -131,7 +124,6 @@ async function startHarvesting() {
         const catHtml = await request(pageUrl);
         if (!catHtml) continue;
 
-        // ดักจับลิงก์หนังเดี่ยวทั้งหมดในหน้านั้นๆ
         const regex = /href="https:\/\/kubhd24\.net\/movie\/([^"\/]+)\//g;
         const ids = Array.from(new Set([...catHtml.matchAll(regex)].map(m => m[1]))).filter(i => i !== 'movie');
         
@@ -142,7 +134,8 @@ async function startHarvesting() {
             loader.textContent = `⏳ หน้า ${p} | เรื่องที่ ${i+1}/${ids.length}: ${ids[i]}`;
             
             const data = await parseMovie(ids[i]);
-            if (data && data.episodes.length > 0) {
+            // บังคับเรนเดอร์การ์ดทันทีที่มีข้อมูล เพื่อไม่ให้หน้าเว็บโล่ง
+            if (data) {
                 renderCard(data, p);
             }
         }
@@ -151,15 +144,15 @@ async function startHarvesting() {
 }
 
 function renderCard(data, pageNum) {
+    let streamUrl = (data.episodes && data.episodes[0]) ? data.episodes[0].url : 'ไม่พบลิงก์สตรีมหรือถูกบล็อก';
+    
     let m3u = "#EXTM3U\n";
-    data.episodes.forEach(ep => {
-        m3u += `#EXTINF:-1 tvg-logo="${data.poster}" group-title="หนังออนไลน์ 2026", ${data.title}\n${ep.url}\n`;
-    });
+    m3u += `#EXTINF:-1 tvg-logo="${data.poster}" group-title="หนังภาพยนตร์เดี่ยว", ${data.title}\n${streamUrl}\n`;
 
     const card = document.createElement("div");
     card.className = "card";
     card.innerHTML = `
-        <img src="${data.poster}" alt="Poster">
+        <img src="${data.poster || 'https://via.placeholder.com/300x240?text=No+Poster'}" alt="Poster">
         <div class="card-body">
             <div>
                 <span class="badge">หน้า ${pageNum}</span>
