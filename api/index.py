@@ -1,8 +1,9 @@
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, PlainTextResponse
+from fastapi.responses import StreamingResponse, PlainTextResponse, HTMLResponse
 import httpx
 from urllib.parse import urljoin, urlparse, quote
+import os
 
 app = FastAPI()
 
@@ -14,10 +15,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 🌐 สั่งให้ดึงหน้าแรกจาก public/index.html มาโชว์อัตโนมัติ
+@app.get("/", response_class=HTMLResponse)
+async def read_index():
+    index_path = os.path.join(os.getcwd(), "public", "index.html")
+    if os.path.exists(index_path):
+        with open(index_path, "r", encoding="utf-8") as f:
+            return f.read()
+    return "<h1>พบบัญชีระบบ แต่ไม่พบไฟล์ public/index.html</h1>"
+
 @app.get("/api/proxy")
 async def movie_proxy_engine(
     request: Request,
-    url: str = Query(..., description="ลิงก์ไฟล์ .m3u8 จริงจากเว็บหนัง"),
+    url: str = Query(..., description="ลิงก์ไฟล์ .m3u8 จริง"),
     referer: str = Query(None, description="เว็บต้นทางเอาไว้หลอกระบบบล็อก")
 ):
     base_proxy_url = f"{request.url.scheme}://{request.url.netloc}/api/proxy"
