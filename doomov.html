@@ -72,7 +72,7 @@ async function getStream(postId) {
 }
 
 async function parseSeries(id) {
-    const html = await request(`https://kubhd24.net/series/${id}/`);
+    const html = await request(`https://kubhd24.net/movie/${id}/`);
     if (!html) return null;
     const doc = new DOMParser().parseFromString(html, "text/html");
     const title = doc.querySelector("h1")?.textContent.trim() || id;
