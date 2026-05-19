@@ -54,7 +54,7 @@
 
 <script>
 const PROXY = '/api/proxy-k24hd?url=';
-const BASE_CAT = 'https://kubhd24.net/category/%e0%b8%94%e0%b8%b9%e0%b8%ab%e0%b8%99%e0%b8%b1%e0%b8%87%e0%b8%b1%e0%b8%ad%e0%b8%ad%e0%b8%99%e0%b9%84%e0%b8%a5%e0%b8%99%e0%b9%8c-2026/';
+const BASE_CAT = 'https://kubhd24.net/category/%e0%b8%94%e0%b8%b9%e0%b8%ab%e0%b8%99%e0%b8%b1%e0%b8%87%e0%b8%ad%e0%b8%ad%e0%b8%99%e0%b9%84%e0%b8%a5%e0%b8%99%e0%b9%8c-2026/';
 
 async function request(url, isJson = false) {
     try {
@@ -72,28 +72,42 @@ async function getStream(postId) {
     return `https://media.vdohls.com/${match[1].split('/').pop()}/playlist.m3u8`;
 }
 
-// แก้ไขฟังก์ชันให้แกะข้อมูลแบบ "หนังเดี่ยว" ไม่ใช่ซีรีย์
+// 🛠️ ปรับปรุงฟังก์ชันแกะหน้าหนังเดี่ยวใหม่ทั้งหมดให้ตรงโครงสร้างเว็บจริง 2026
 async function parseMovie(id) {
     const html = await request(`https://kubhd24.net/movie/${id}/`);
     if (!html) return null;
     const doc = new DOMParser().parseFromString(html, "text/html");
     const title = doc.querySelector("h1")?.textContent.trim() || id;
-    const poster = doc.querySelector("img.wp-post-image")?.getAttribute("data-src") || doc.querySelector("img.wp-post-image")?.src || '';
     
-    // หาปุ่มขวัญใจ (Add Favorite) เพื่อดึง Post ID ของหนังเรื่องนั้นๆ มาขอลิงก์เล่น
-    const favoriteButton = doc.querySelector("button.add-favorite");
-    const postId = favoriteButton ? favoriteButton.getAttribute("data-post-id") : null;
+    // ดึงรูปภาพโปสเตอร์
+    const imgEl = doc.querySelector("img.wp-post-image") || doc.querySelector(".poster img");
+    const poster = imgEl ? (imgEl.getAttribute("data-src") || imgEl.src) : '';
+    
+    let postId = null;
+
+    // วิธีที่ 1: ดึงจากกล่อง iframe ตัวเล่นหลักของหน้าหนังเดี่ยว
+    const movieIframe = doc.querySelector(".movie-iframe");
+    if (movieIframe) {
+        postId = movieIframe.getAttribute("data-id");
+    }
+
+    // วิธีที่ 2: ดึงจากปุ่มโหวต/ปุ่มถูกใจ (แผนสำรองหากวิธีแรกไม่ได้)
+    if (!postId) {
+        const favBtn = doc.querySelector("button.add-favorite") || doc.querySelector("[data-post-id]");
+        if (favBtn) postId = favBtn.getAttribute("data-post-id");
+    }
+
+    // วิธีที่ 3: ดึงจากคลาสระบบผู้เล่นตัวเล่นอื่น ๆ 
+    if (!postId) {
+        const playerWrapper = doc.querySelector("[id*='player']");
+        if (playerWrapper) postId = playerWrapper.getAttribute("data-post-id") || playerWrapper.id.replace(/\D/g, "");
+    }
     
     let episodes = [];
     if (postId) {
         const url = await getStream(postId);
-        if (url) episodes.push({ title: "Full Movie", url });
-    } else {
-        // แผนสำรองกรณีใช้ปุ่มเล่นแบบเดี่ยว
-        const playBtn = doc.querySelector("button.ep, .play-btn");
-        if (playBtn && playBtn.id) {
-            const url = await getStream(playBtn.id);
-            if (url) episodes.push({ title: "Full Movie", url });
+        if (url) {
+            episodes.push({ title: "Full Movie", url });
         }
     }
     
@@ -117,7 +131,7 @@ async function startHarvesting() {
         const catHtml = await request(pageUrl);
         if (!catHtml) continue;
 
-        // แก้ไขให้ตรวจจับลิงก์เฉพาะที่เป็นภาพยนตร์เดี่ยว (/movie/)
+        // ดักจับลิงก์หนังเดี่ยวทั้งหมดในหน้านั้นๆ
         const regex = /href="https:\/\/kubhd24\.net\/movie\/([^"\/]+)\//g;
         const ids = Array.from(new Set([...catHtml.matchAll(regex)].map(m => m[1]))).filter(i => i !== 'movie');
         
