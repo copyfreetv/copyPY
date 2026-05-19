@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>JSON Slug + name Split Tool</title>
+<style>
+body { font-family: Arial; background:#111; color:#fff; padding:20px; }
+button { padding:10px 18px; margin:10px 0; cursor:pointer; background:#0f0; border:none; font-weight:bold; }
+textarea { width:100%; height:450px; background:#000; color:#0f0; padding:15px; border:1px solid #444; font-family: monospace; font-size:13px; }
+</style>
+</head>
+<body>
+
+<h2>JSON Slug + name Split Generator</h2>
+
+<button onclick="downloadJSON()">ดาวน์โหลดไฟล์ใหม่</button>
+
+<h3>Preview</h3>
+<textarea id="preview"></textarea>
+
+<script>
+
+let updatedData = [];
+
+// =============================
+function getURLParam(name) {
+    const params = new URLSearchParams(window.location.search);
+    return params.get(name);
+}
+
+// =============================
+function splitName(name) {
+
+    if (!name) return { nameEN:"", nameTH:"" };
+
+    name = name.replace(/\(\d{4}\)/g, "").trim();
+
+    const thaiMatch = name.match(/[\u0E00-\u0E7F]/);
+
+    let nameEN = "";
+    let nameTH = "";
+
+    if (thaiMatch) {
+        const index = thaiMatch.index;
+        nameEN = name.substring(0, index).trim();
+        nameTH = name.substring(index).trim();
+    } else {
+        nameEN = name.trim();
+    }
+
+    return { nameEN, nameTH };
+}
+
+// =============================
+function generateSlug(text) {
+    return text
+        .replace(/[^A-Za-z0-9\s]/g, "")
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, "-")
+        .replace(/-+/g, "-");
+}
+
+// =============================
+function extractYear(name) {
+    const match = name.match(/\((\d{4})\)/);
+    return match ? parseInt(match[1]) : null;
+}
+
+// =============================
+async function loadJSON() {
+
+    const url = getURLParam("url");
+    if (!url) {
+        alert("ไม่พบ ?url=");
+        return;
+    }
+
+    try {
+
+        const response = await fetch(url);
+        const json = await response.json();
+
+        const usedIds = new Set();
+
+updatedData = json.map(item => {
+
+    const { nameEN, nameTH } = splitName(item.name);
+
+    let finalId = (item.id && item.id.trim() !== "")
+        ? item.id.trim()
+        : generateSlug(nameEN);
+
+    let baseId = finalId;
+    let counter = 2;
+
+    while (usedIds.has(finalId)) {
+        finalId = baseId + "-" + counter++;
+    }
+
+    usedIds.add(finalId);
+
+// ===== SAFE INFO + YEAR =====
+let finalInfo;
+const extractedYear = extractYear(item.name);
+
+if (typeof item.info === "object" && item.info !== null) {
+
+    finalInfo = { ...item.info };
+
+    // เติม poster ถ้ายังไม่มี
+    if (!finalInfo.poster && item.poster) {
+        finalInfo.poster = item.poster;
+    }
+
+} else {
+
+    finalInfo = {
+        poster: item.poster || "",
+        sound: item.info || ""
+    };
+}
+
+// ===== ดึง sound ออกมาก่อน =====
+const soundValue = finalInfo.sound || "";
+delete finalInfo.sound;
+
+// ===== เพิ่ม plot ถ้ายังไม่มี =====
+if (!("plot" in finalInfo)) {
+    finalInfo.plot = "";
+}
+
+// ===== เพิ่ม year ถ้ายังไม่มี =====
+if (!finalInfo.year && extractedYear) {
+    finalInfo.year = extractedYear;
+}
+
+// ===== ใส่ sound กลับท้ายสุด =====
+finalInfo.sound = soundValue;
+
+    return {
+        player: item.player || "",
+        id: finalId,
+        nameEN,
+        nameTH,
+        name: item.name,
+        category: item.category || "",
+        info: finalInfo,
+        video: item.video || "",
+        subtitle: item.subtitle || "",
+        Referrer: item.Referrer || ""
+    };
+});
+
+        document.getElementById("preview").value =
+            JSON.stringify(updatedData, null, 2);
+
+    } catch (err) {
+        alert("โหลด JSON ไม่สำเร็จ");
+        console.error(err);
+    }
+}
+
+// =============================
+function downloadJSON() {
+
+    if (!updatedData.length) {
+        alert("ยังไม่มีข้อมูล");
+        return;
+    }
+
+    const blob = new Blob(
+        [JSON.stringify(updatedData, null, 2)],
+        { type: "application/json" }
+    );
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "new_updated.json";
+    a.click();
+
+    URL.revokeObjectURL(url);
+}
+
+loadJSON();
+
+</script>
+
+</body>
+</html>

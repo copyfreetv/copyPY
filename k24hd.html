@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>Kub24HD Movie 2026 Fixer</title>
+    <style>
+        :root { --main: #00d2ff; --bg: #0f172a; --card: #1e293b; }
+        body { font-family: 'Tahoma', sans-serif; background: var(--bg); color: #f8fafc; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .control-panel { background: var(--card); padding: 20px; border-radius: 15px; margin-bottom: 25px; border: 1px solid #334155; }
+        .input-group { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        input { background: #0f172a; border: 1px solid #334155; color: #fff; padding: 10px; border-radius: 8px; width: 60px; text-align: center; }
+        button.start-btn { background: var(--main); color: #000; padding: 10px 25px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        .status { margin-top: 15px; font-size: 14px; color: var(--main); }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; margin-top: 20px; }
+        .card { background: var(--card); border-radius: 12px; overflow: hidden; border: 1px solid #334155; }
+        .card img { width: 100%; height: 350px; object-fit: cover; }
+        .card-content { padding: 15px; }
+        .card-title { font-size: 14px; font-weight: bold; margin-bottom: 10px; height: 34px; overflow: hidden; color: #e2e8f0; }
+        button.copy-btn { background: #334155; color: white; border: none; padding: 8px; width: 100%; border-radius: 5px; cursor: pointer; font-size: 12px; }
+        pre { background: #000; color: #10b981; padding: 10px; border-radius: 8px; font-size: 10px; margin-top: 10px; overflow-x: auto; display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>🎬 Kub24HD Movie 2026 Parser (Fixed)</h2>
+    
+    <div class="control-panel">
+        <div class="input-group">
+            <label>หน้าเริ่มต้น:</label>
+            <input type="number" id="startP" value="1">
+            <label>ถึงหน้า:</label>
+            <input type="number" id="endP" value="1">
+            <button class="start-btn" onclick="run()">เริ่มดึงข้อมูลหนัง</button>
+        </div>
+        <div id="status" class="status">พร้อมทำงาน...</div>
+    </div>
+
+    <div id="result" class="grid"></div>
+</div>
+
+<script>
+const PROXY = '/api/proxy-k24hd?url=';
+const TARGET_URL = 'https://kubhd24.net/category/%E0%B8%94%E0%B8%B9%E0%B8%AB%E0%B8%99%E0%B8%B1%E0%B8%87%E0%B8%AD%E0%B8%AD%E0%B8%99%E0%B9%84%E0%B8%A5%E0%B8%99%E0%B9%8C-2026/';
+
+async function fetchRaw(url) {
+    try {
+        const res = await fetch(PROXY + encodeURIComponent(url));
+        return res.ok ? await res.text() : null;
+    } catch (e) { return null; }
+}
+
+async function getM3U8(postId) {
+    const apiUrl = `https://kubhd24.net/wp-admin/admin-ajax.php?action=mix_get_player&post_id=${postId}`;
+    const res = await fetch(PROXY + encodeURIComponent(apiUrl));
+    const json = await res.json();
+    if (!json.success) return null;
+    const match = json.player.match(/data-src="([^"]+)"/);
+    if (!match) return null;
+    return `https://media.vdohls.com/${match[1].split('/').pop()}/playlist.m3u8`;
+}
+
+async function parseMovie(url) {
+    const html = await fetchRaw(url);
+    if (!html) return null;
+    
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const title = doc.querySelector("h1")?.textContent.trim();
+    const poster = doc.querySelector("img.wp-post-image")?.getAttribute("data-src") || doc.querySelector("img.wp-post-image")?.src;
+    
+    // --- จุดแก้ไขสำคัญ: ค้นหา Post ID สำหรับหนัง ---
+    let postId = null;
+    
+    // 1. หาจากปุ่มที่มีคลาส .ep หรือ .source-select-btn
+    const btn = doc.querySelector("button.ep, button.source-select-btn, .player-option button");
+    if (btn && btn.id) {
+        postId = btn.id;
+    } 
+    // 2. ถ้าไม่เจอ ให้ค้นหาจากตัวแปร JS ในหน้าเว็บ (มักจะมี post_id: "xxxx")
+    else {
+        const idMatch = html.match(/post_id\s*[:=]\s*["']?(\d+)["']?/);
+        if (idMatch) postId = idMatch[1];
+    }
+
+    if (!postId) return null;
+    
+    const stream = await getM3U8(postId);
+    return stream ? { title, poster, stream } : null;
+}
+
+async function run() {
+    const sP = parseInt(document.getElementById("startP").value);
+    const eP = parseInt(document.getElementById("endP").value);
+    const status = document.getElementById("status");
+    const result = document.getElementById("result");
+    
+    result.innerHTML = "";
+    
+    for (let p = sP; p <= eP; p++) {
+        status.innerText = `🔍 กำลังหาหนังในหน้าหมวดหมู่ที่ ${p}...`;
+        const pageUrl = p === 1 ? TARGET_URL : `${TARGET_URL}page/${p}/`;
+        const catHtml = await fetchRaw(pageUrl);
+        if (!catHtml) continue;
+
+        // ดึงลิงก์หนังทั้งหมด
+        const regex = /href="(https:\/\/kubhd24\.net\/[^"\/]+\/)"/g;
+        const matches = [...catHtml.matchAll(regex)];
+        const urls = [...new Set(matches.map(m => m[1]))].filter(u => 
+            !u.includes('/category/') && 
+            !u.includes('/series/') && 
+            u !== 'https://kubhd24.net/'
+        );
+
+        for (let i = 0; i < urls.length; i++) {
+            status.innerText = `⏳ หน้า ${p} | เรื่องที่ ${i+1}/${urls.length}: กำลังดึงลิงก์...`;
+            const data = await parseMovie(urls[i]);
+            if (data) {
+                const m3u = `#EXTM3U\n#EXTINF:-1 tvg-logo="${data.poster}" group-title="Movies 2026", ${data.title}\n${data.stream}`;
+                const card = document.createElement("div");
+                card.className = "card";
+                card.innerHTML = `
+                    <img src="${data.poster}">
+                    <div class="card-content">
+                        <div class="card-title">${data.title}</div>
+                        <button class="copy-btn" onclick="toggle(this)">📂 คลิกดู M3U8</button>
+                        <pre>${m3u}</pre>
+                    </div>
+                `;
+                result.appendChild(card);
+            }
+        }
+    }
+    status.innerText = "✅ ดึงข้อมูลสำเร็จทุกรายการ";
+}
+
+function toggle(btn) {
+    const pre = btn.nextElementSibling;
+    pre.style.display = pre.style.display === "block" ? "none" : "block";
+    btn.innerText = pre.style.display === "block" ? "✖ ปิด" : "📂 คลิกดู M3U8";
+}
+</script>
+</body>
+</html>

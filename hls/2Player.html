@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>HLS-Player</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@0.14.17"></script>
+  <style>
+    body { margin: 0; }
+    #video {
+      width: 100%;
+      max-width: 854px;
+      aspect-ratio: 16/9;
+      margin: 0 auto;
+      background: black;
+    }
+    #bdnOverlay {
+      position: absolute;
+      bottom: 12%;
+      width: 100%;
+      text-align: center;
+      color: white;
+      font-size: 24px;
+      text-shadow: 2px 2px 4px #000;
+      z-index: 998;
+    }
+  </style>
+</head>
+<body class="bg-gray-900 text-white">
+
+  <main class="container mx-auto px-4 mt-8 mb-16">
+    <video id="video" controls crossorigin="anonymous"></video>
+    <h2 id="movie-title" class="text-2xl font-bold mt-4 mb-4 text-blue-500">กำลังโหลด...</h2>
+    <p id="error-message" class="text-red-500 mt-4 hidden">เกิดข้อผิดพลาดในการโหลดวิดีโอ</p>
+
+    <div class="mt-4 flex gap-4 flex-wrap">
+      <label class="text-white">Subtitle:
+        <select id="subtitleSelector" class="bg-gray-800 text-white px-2 py-1 rounded"></select>
+      </label>
+      <label class="text-white">Audio:
+        <select id="audioSelector" class="bg-gray-800 text-white px-2 py-1 rounded"></select>
+      </label>
+      <label class="text-white">Quality:
+        <select id="qualitySelector" class="bg-gray-800 text-white px-2 py-1 rounded"></select>
+      </label>
+    </div>
+  </main>
+
+  <script>
+    const cdnList = ['statics-01.duckduckcdn.com', 'statics-02.duckduckcdn.com'];
+    const subtitleSelector = document.getElementById('subtitleSelector');
+    const audioSelector = document.getElementById('audioSelector');
+    const qualitySelector = document.getElementById('qualitySelector');
+
+    function getDecodedVideoURL() {
+      const params = new URLSearchParams(window.location.search);
+      const encoded = params.get('url');
+      if (!encoded) return '';
+      try {
+        return decodeURIComponent(atob(encoded));
+      } catch (e) {
+        console.error("❌ Failed to decode base64 URL:", e);
+        return '';
+      }
+    }
+
+    function extractVideoId(url) {
+      try {
+        const u = new URL(url);
+        const segments = u.pathname.split('/');
+        const uuidRegex = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
+        for (const segment of segments) {
+          if (uuidRegex.test(segment)) return segment;
+        }
+        return null;
+      } catch (e) {
+        console.error("❌ Invalid URL format:", e);
+        return null;
+      }
+    }
+
+    async function tryFallbackFetch(path) {
+      for (const cdn of cdnList) {
+        try {
+          const url = `https://${cdn}/${path}`;
+          const res = await fetch(url);
+          if (res.ok) return { res, cdn };
+        } catch (e) {
+          console.warn(`⚠️ Failed to fetch from ${cdn}:`, e);
+        }
+      }
+      throw new Error("❌ All CDN fetch attempts failed");
+    }
+
+    async function initPlayer() {
+      const videoURL = getDecodedVideoURL();
+      const videoId = extractVideoId(videoURL);
+      const video = document.getElementById('video');
+      const title = document.getElementById('movie-title');
+      const errorMessage = document.getElementById('error-message');
+
+      if (!videoURL || !videoId) {
+        errorMessage.textContent = '❌ ไม่พบ URL หรือ videoId';
+        errorMessage.classList.remove('hidden');
+        return;
+      }
+
+      title.textContent = `🎬 Video ID: ${videoId}`;
+
+      let metadata, activeCDN;
+      try {
+        const { res, cdn } = await tryFallbackFetch(`${videoId}/subtitle_metadata.json`);
+        metadata = await res.json();
+        activeCDN = cdn;
+      } catch (e) {
+        console.warn("⚠️ Subtitle metadata not found:", e);
+        metadata = null;
+      }
+
+      const bdnSubtitles = {};
+
+      if (metadata) {
+        for (const lang in metadata) {
+          if (lang === "default") continue;
+          const entries = metadata[lang];
+          entries.forEach(entry => {
+            if (!entry.error) {
+              const subtitleURL = `https://${activeCDN}/${videoId}/${entry.pathName}${entry.codec === "VTT" ? ".vtt" : "/index.xml"}`;
+
+              if (entry.codec === "VTT") {
+                const t = document.createElement("track");
+                t.kind = "subtitles";
+                t.label = lang.toUpperCase();
+                t.srclang = lang;
+                t.src = subtitleURL;
+                t.default = false;
+                video.appendChild(t);
+              } else if (entry.codec === "BDN") {
+                if (!bdnSubtitles[lang]) bdnSubtitles[lang] = [];
+                bdnSubtitles[lang].push(subtitleURL);
+              }
+
+              const opt = document.createElement("option");
+              opt.value = lang;
+              opt.text = lang.toUpperCase();
+              subtitleSelector.appendChild(opt);
+            }
+          });
+        }
+
+        subtitleSelector.addEventListener("change", async function () {
+          const selected = this.value;
+          Array.from(video.textTracks).forEach(track => track.mode = "disabled");
+
+          const existingOverlay = document.getElementById("bdnOverlay");
+          if (existingOverlay) existingOverlay.remove();
+
+          if (bdnSubtitles[selected]) {
+            const overlay = document.createElement("div");
+            overlay.id = "bdnOverlay";
+            document.body.appendChild(overlay);
+
+            const xmlURL = bdnSubtitles[selected][0];
+            const xmlRes = await fetch(xmlURL);
+            const xmlText = await xmlRes.text();
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(xmlText, "application/xml");
+
+            const subtitles = Array.from(xmlDoc.getElementsByTagName("Subtitle")).map(el => ({
+              start: parseFloat(el.getAttribute("start")),
+              end: parseFloat(el.getAttribute("end")),
+              text: el.textContent.trim()
+            }));
+
+            function updateSubtitle() {
+              const currentTime = video.currentTime;
+              const active = subtitles.find(s => currentTime >= s.start && currentTime <= s.end);
+              overlay.textContent = active ? active.text : "";
+            }
+
+            video.addEventListener("timeupdate", updateSubtitle);
+          }
+        });
+      }
+
+      if (Hls.isSupported()) {
+        const hls = new Hls();
+        hls.attachMedia(video);
+
+        let fallbackIndex = 0;
+        const fallbackSources = cdnList.map(cdn => `https://${cdn}/${videoId}/master.m3u8`);
+
+        hls.on(Hls.Events.ERROR, function (event, data) {
+          if (data.type === 'networkError' || data.details === 'manifestLoadError') {
+            fallbackIndex++;
+            if (fallbackIndex < fallbackSources.length) {
+              console.warn(`⚠️ Fallback to ${fallbackSources[fallbackIndex]}`);
+              hls.loadSource(fallbackSources[fallbackIndex]);
+            } else {
+              errorMessage.textContent = '❌ ไม่สามารถโหลดวิดีโอจากทุก CDN';
+              errorMessage.classList.remove('hidden');
+            }
+          }
+        });
+
+        hls.on(Hls.Events.MEDIA_ATTACHED, function () {
+          hls.loadSource(videoURL);
+        });
+
+        hls.on(Hls.Events.MANIFEST_PARSED, function () {
+          audioSelector.innerHTML = '';
+          hls.audioTracks.forEach((track, index) => {
+            const option = document.createElement('option');
+            option.value = index;
+            option.text = `${track.name} (${track.lang})`;
+            audioSelector.appendChild(option);
+          });
+          audioSelector.addEventListener('change', function () {
+            hls.audioTrack = parseInt(this.value);
+          });
+
+          qualitySelector.innerHTML = '<option value="-1">Auto</option>';
+          hls.levels.forEach((level, index) => {
+            const label = level.height ? `${level.height}p` : `${Math.round(level.bitrate / 1000)}kbps`;
+            const option = document.createElement('option');
+            option.value = index;
+            option.text = label;
+            qualitySelector.appendChild(option);
+          });
+
+          qualitySelector.addEventListener('change', function () {
+            hls.currentLevel = parseInt(this.value); // -1 = auto
+          });
+        });
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = videoURL;
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', initPlayer);
+  </script>
+</body>
+</html>

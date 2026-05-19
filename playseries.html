@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>APP Doo Channel</title>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <style>
+    * { box-sizing: border-box; font-family: 'Prompt', sans-serif; margin: 0; padding: 0; }
+    body { background: #111; color: #fff; padding: 20px; }
+    h1 { margin-bottom: 18px; }
+    .header-container { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
+    .channel-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; }
+    .channel-card { background: #1c1c1c; padding: 12px; border-radius: 8px; text-align: center; transition: transform 0.2s; cursor: pointer; position: relative; }
+    .channel-card:hover { transform: scale(1.05); background: #222; }
+    .channel-card img { width: 100%; border-radius: 6px; height: 210px; object-fit: cover; margin-bottom: 10px; }
+    .channel-card .title { font-size: 0.95em; min-height: 40px; font-weight: bold; }
+    .section-title { font-size: 1.2em; margin: 24px 0 12px; border-left: 5px solid #4ade80; padding-left: 10px; }
+    #loading { text-align: center; margin-top: 40px; color: #aaa; font-size: 1.1em; }
+    .pagination { display: flex; justify-content: center; margin-top: 20px; gap: 6px; flex-wrap: wrap; }
+    .pagination button { background: #222; color: #fff; border: none; padding: 8px 18px; border-radius: 6px; cursor: pointer; font-weight: 600; }
+    .pagination button.active { background: #4ade80; color: #111; }
+    
+    /* Dialog / Modal */
+    .dialog-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.8); z-index: 999;
+      overflow: auto;
+      display: flex; justify-content: center; align-items: center;
+      padding: 20px;
+    }
+    .dialog {
+      background: #000; border-radius: 10px; width: 100%; max-width: 768px; padding: 20px; color: #fff; position: relative;
+      max-height: 100vh; overflow-y: auto;
+    }
+    .dialog img { width: 100%; border-radius: 10px; margin-bottom: 16px; }
+    .dialog h2 { font-size: 1.3em; margin-bottom: 8px; }
+    .dialog .info { font-size: 0.9em; color: #aaa; margin-bottom: 10px; }
+    .dialog .desc { font-size: 0.95em; color: #ddd; margin-bottom: 10px; }
+    .dialog .close-btn {
+      position: absolute; top: 10px; right: 12px; font-size: 1.2em; background: transparent; color: #fff; border: none; cursor: pointer;
+    }
+    .dialog .video-wrapper { margin-bottom: 16px; }
+    .dialog .video-wrapper video { width: 100%; border-radius: 10px; background: #000; }
+    .dialog .actions { display: flex; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+    .dialog .actions button {
+      background: #4ade80; color: #111; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: bold;
+    }
+    
+    /* Buttons & Bars */
+    .episode-list { margin-top: 12px; margin-bottom: 16px; display: flex; flex-wrap: wrap; gap: 10px; }
+    .episode-list button { padding: 6px 10px; background: #222; border: none; border-radius: 6px; color: #fff; cursor: pointer; }
+    .episode-list button:hover { background: #4ade80; color: #111; }
+    .episode-list button.watched { background: #4ade80; color: #111; font-weight: bold; }
+    .episode-list button.current { border: 2px solid #fff; }
+
+    .filter-bar { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; align-items: center; width: 100%; max-width: 400px; margin-left: auto; margin-right: auto; }
+    .filter-bar input, .filter-bar select { padding: 10px 12px; border-radius: 6px; border: none; font-size: 1em; width: 100%; }
+
+    .category-bar { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+    .category-bar button { background: #333; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+    .category-bar button.active { background: #4ade80; color: #111; }
+
+    /* ปุ่มสลับโหมดทีวี (อัพเกรดใหม่) */
+    .btn-tv-mode { background: #a855f7 !important; color: #fff !important; display: flex; align-items: center; gap: 5px; }
+    .btn-tv-mode.active { background: #ef4444 !important; }
+
+    /* Modal รหัสผ่าน */
+    .lock-modal { background: #1a1a1a; border-radius: 12px; padding: 25px; width: 100%; max-width: 340px; text-align: center; border: 1px solid #333; }
+    .lock-modal h3 { margin-bottom: 15px; font-size: 1.2em; }
+    .lock-modal input { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #444; background: #222; color: #fff; text-align: center; font-size: 1.1em; margin-bottom: 15px; }
+    .lock-modal .modal-btns { display: flex; gap: 10px; justify-content: center; }
+    .lock-modal button { padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-weight: bold; }
+    .lock-modal .btn-confirm { background: #4ade80; color: #111; }
+    .lock-modal .btn-cancel { background: #444; color: #fff; }
+    .lock-modal .admin-contact { margin-top: 15px; font-size: 0.85em; color: #a855f7; cursor: pointer; text-decoration: underline; }
+
+    .actions button.favorite { background-color: #ff4444 !important; color: white !important; }
+    .fav-btn.active { background-color: red; color: white; }
+
+    /* Cast & Rating */
+    .cast-section { margin-top: 1rem; overflow-x: auto; }
+    .cast-container { display: flex; flex-wrap: nowrap; gap: 10px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: thin; }
+    .cast-container::-webkit-scrollbar { height: 6px; }
+    .cast-container::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.3); border-radius: 10px; }
+    .cast-card { flex: 0 0 auto; width: 100px; text-align: center; font-size: 0.85rem; color: white; }
+    .cast-card img { width: 100%; border-radius: 8px; object-fit: cover; }
+    .cast-name { margin-top: 4px; }
+    .rating-badge { position: absolute; top: 6px; right: 6px; background: rgba(0,0,0,0.7); padding: 2px 6px; font-size: 0.75em; border-radius: 4px; font-weight: bold; color: #fff; z-index: 10; }
+  </style>
+</head>
+
+<body>
+  <div class="header-container">
+    <h1>🎬 รวมเว็บดูหนังซีรีส์ </h1>
+    <!-- ✅ ปุ่มสลับหน้าลับดูทีวี -->
+    <button id="tvModeBtn" class="category-bar button btn-tv-mode" onclick="toggleTvMode()">📺 สลับไปหน้าดูทีวี</button>
+  </div>
+
+  <div class="filter-bar">
+    <input type="text" id="searchInput" placeholder="🔍 ค้นหาชื่อเรื่อง..." oninput="filterChannels()">
+    <select id="domainSelect" onchange="filterChannels()"></select>
+  </div>
+
+  <div class="category-bar" id="categoryBar">
+    <button onclick="setCategory('all')">📺 ทั้งหมด</button>
+    <button onclick="setCategory('latest')">🆕 ล่าสุด</button>
+    <button onclick="setCategory('popular')">🔥 ยอดนิยม</button>
+    <button onclick="setCategory('favorite')">⭐ รายการโปรด</button>
+  </div>
+
+  <div id="channelContainer">
+    <div id="loading">⭯️ กำลังโหลดรอสักครู่...</div>
+  </div>
+  
+  <div id="dialogContainer"></div>
+
+  <!-- ✅ Modal สำหรับใส่รหัสผ่านหน้าลับ -->
+  <div id="lockModalOverlay" class="dialog-overlay" style="display: none;">
+    <div class="lock-modal">
+      <h3>🔒 พื้นที่นี้ต้องการรหัสผ่าน</h3>
+      <input type="password" id="tvPasswordInput" placeholder="กรอกรหัสผ่านเข้าหน้าทีวี">
+      <div class="modal-btns">
+        <button class="btn-confirm" onclick="verifyTvPassword()">ยืนยัน</button>
+        <button class="btn-cancel" onclick="closeLockModal()">ยกเลิก</button>
+      </div>
+      <!-- ✅ ข้อความขอแอดมิน -->
+      <div class="admin-contact" onclick="alert('กรุณาติดต่อแอดมินที่ Line ID: @YourAdmin LINE หรือ Telegram เพื่อขอรับรหัสผ่านฟรี!')">
+        🚫 ไม่มีรหัสผ่าน? คลิกเพื่อขอแอดมิน
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ⚙️ ตั้งค่าความปลอดภัย
+    const TV_SECRET_PASSWORD = "1234"; // 🔑 เปลี่ยนรหัสผ่านตรงนี้ได้ตามต้องการ
+    const TV_DATA_URL = 'https://dl.dropboxusercontent.com/scl/fi/9pr3oci7870tqsd3wn7gg/tv.json?rlkey=8a7ku7mytpogfn0wwh3sk1yxz&e=1&st=2zig02ov&dl=0'; // ลิงก์ช่องทีวี (เปลี่ยนแยกได้)
+    const MOVIE_DATA_URL = 'https://dl.dropboxusercontent.com/scl/fi/9pr3oci7870tqsd3wn7gg/tv.json?rlkey=8a7ku7mytpogfn0wwh3sk1yxz&e=1&st=2zig02ov&dl=0';
+
+    const TMDB_API_KEY = '76e168fecc79ddcf6d7fc58a0d86e30e';
+    const TMDB_BASE_URL = 'https://api.themoviedb.org/3/search/multi';
+    const TMDB_IMG = 'https://image.tmdb.org/t/p/w500';
+    const PAGE_SIZE = 10;
+    
+    let currentPage = 1;
+    let channels = [];
+    let allChannels = [];
+    let favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
+    let currentCategory = 'all';
+    let recentWatched = JSON.parse(localStorage.getItem('recentWatched') || '[]');
+    let watchedEpisodes = JSON.parse(localStorage.getItem('watchedEpisodes') || '{}');
+    let isTvModeActive = false; // สถานะปลดล็อคหน้าทีวี
+
+    // สลับโหลดหน้าทีวี
+    function toggleTvMode() {
+      if (isTvModeActive) {
+        // หากเปิดอยู่แล้ว ให้สลับกลับหน้าปกติ
+        isTvModeActive = false;
+        document.getElementById('tvModeBtn').innerHTML = "📺 สลับไปหน้าดูทีวี";
+        document.getElementById('tvModeBtn').classList.remove('active');
+        document.querySelector('h1').innerHTML = "🎬 รวมเว็บดูหนังซีรีส์";
+        loadData(MOVIE_DATA_URL);
+      } else {
+        // หากยังไม่ได้เปิด ให้เด้งหน้าต่างถามรหัสผ่าน
+        document.getElementById('lockModalOverlay').style.display = 'flex';
+        document.getElementById('tvPasswordInput').value = '';
+        document.getElementById('tvPasswordInput').focus();
+      }
+    }
+
+    function closeLockModal() {
+      document.getElementById('lockModalOverlay').style.display = 'none';
+    }
+
+    function verifyTvPassword() {
+      const inputPass = document.getElementById('tvPasswordInput').value;
+      if (inputPass === TV_SECRET_PASSWORD) {
+        isTvModeActive = true;
+        closeLockModal();
+        
+        // อัปเดต UI หน้าทีวีลับ
+        document.getElementById('tvModeBtn').innerHTML = "❌ ออกจากหน้าทีวี";
+        document.getElementById('tvModeBtn').classList.add('active');
+        document.querySelector('h1').innerHTML = "📺 ระบบรับชมทีวีออนไลน์ (Premium)";
+        
+        // ดึงข้อมูลชุดทีวี
+        loadData(TV_DATA_URL);
+        alert('🔓 ปลดล็อคหน้าดูทีวีเรียบร้อย!');
+      } else {
+        alert('❌ รหัสผ่านไม่ถูกต้อง! กรุณาติดต่อขอจากแอดมิน');
+      }
+    }
+
+    function loadData(url) {
+      document.getElementById('channelContainer').innerHTML = `<div id="loading">⭯️ กำลังโหลดข้อมูล...</div>`;
+      fetchChannelData(url).then(data => {
+        allChannels = data;
+        channels = data;
+        populateDomainSelect();
+        setCategory('all');
+      });
+    }
+
+    async function fetchChannelData(url) {
+      try {
+        const res = await fetch(url || MOVIE_DATA_URL);
+        return await res.json();
+      } catch (e) {
+        console.error('โหลดข้อมูลล้มเหลว', e);
+        return [];
+      }
+    }
+
+    // เริ่มต้นระบบครั้งแรก
+    loadData(MOVIE_DATA_URL);
+
+    // --- ส่วนการทำงานฟังก์ชันเดิมของคุณคงอยู่ทั้งหมด ---
+    function setCategory(cat) {
+      currentCategory = cat;
+      filterChannels();
+      const buttons = document.querySelectorAll('.category-bar button');
+      buttons.forEach(btn => btn.classList.remove('active'));
+      const activeBtn = [...buttons].find(btn => btn.textContent.includes(getCategoryLabel(cat)));
+      if (activeBtn) activeBtn.classList.add('active');
+    }
+
+    function getCategoryLabel(cat) {
+      switch (cat) {
+        case 'all': return 'ทั้งหมด';
+        case 'latest': return 'ล่าสุด';
+        case 'popular': return 'ยอดนิยม';
+        case 'favorite': return 'รายการโปรด';
+        default: return '';
+      }
+    }
+
+    function extractDomain(url) {
+      try { const u = new URL(url); return u.hostname; } catch (e) { return ''; }
+    }
+
+    function populateDomainSelect() {
+      const domainSet = new Set();
+      channels.forEach(ch => {
+        if (ch.url) domainSet.add(extractDomain(ch.url));
+        if (Array.isArray(ch.episodes)) {
+          ch.episodes.forEach(ep => { if (ep.url) domainSet.add(extractDomain(ep.url)); });
+        }
+      });
+      const select = document.getElementById('domainSelect');
+      select.innerHTML = `<option value="">🌐 ทุกโดเมน</option>` + 
+        [...domainSet].sort().map(domain => `<option value="${domain}">${domain}</option>`).join('');
+    }
+
+    function uniqueByName(arr) {
+      const seen = new Set();
+      return arr.filter(item => { if (seen.has(item.name)) return false; seen.add(item.name); return true; });
+    }
+
+    function filterChannels() {
+      const search = document.getElementById('searchInput').value.toLowerCase();
+      const domain = document.getElementById('domainSelect').value;
+
+      if (currentCategory === 'latest') {
+        channels = recentWatched
+          .filter(e => e.name.toLowerCase().includes(search) && (!domain || e.url.includes(domain)))
+          .map(e => { return { ...allChannels.find(c => c.name === e.name), ...e }; })
+          .filter(Boolean);
+        renderChannelsPage(1);
+        return;
+      }
+
+      if (currentCategory === 'popular') {
+        const savedViews = JSON.parse(localStorage.getItem('channelViews') || '{}');
+        channels = allChannels
+          .map(ch => {
+            const rw = recentWatched.find(r => r.name === ch.name);
+            return { ...ch, views: savedViews[ch.name] || 0, logo: rw?.logo || `/proxy-image?url=${ch.logo}` };
+          })
+          .filter(c => c.views > 0);
+        channels = uniqueByName(channels);
+        channels.sort((a, b) => b.views - a.views);
+        channels = channels.slice(0, 10);
+        renderChannelsPage(1);
+        return;
+      }
+
+      channels = allChannels
+        .filter(c => {
+          const matchName = c.name.toLowerCase().includes(search);
+          const matchDomain = !domain || (c.url && c.url.includes(domain)) || (c.episodes && c.episodes.some(e => e.url.includes(domain)));
+          let matchCategory = true;
+          if (currentCategory === 'favorite') { matchCategory = favorites.includes(c.name); }
+          return matchName && matchDomain && matchCategory;
+        })
+        .map(c => {
+          const rw = recentWatched.find(r => r.name === c.name);
+          return { ...c, logo: rw?.logo || c.logo };
+        });
+
+      renderChannelsPage(1);
+    }
+
+    async function fetchTmdbDetail(name) {
+      try {
+        let cleanName = name
+          .replace(/^(ดูหนัง|การ์ตูน|หนัง|อนิเมะ|ซีรีส์|ซีรี่ย์)\s+/gi, '')
+          .replace(/S\d+|ซีซั่น\s*\d+|Season\s*\d+|EP\s*\d+|ตอน\s*\d+|ภาค\s*\d+|ปี\s*\d+/gi, '')
+          .replace(/\[[^\]]*\]/g, '')
+          .replace(/พากย์ไทย|เต็มเรื่อง|ซับไทย|พากย์ไทยโรง|เสียงไทยโรง|โรง|Full\s*-?\s*HD|4K|1080p|720p/gi, '')
+          .replace(/\(\d{4}\)/g, '')
+          .replace(/[0-9]{4}/g, '')
+          .replace(/[-\(\[].*$/, '')
+          .replace(/\s{2,}/g, ' ')
+          .trim();
+
+        if (cleanName.includes('–')) {
+          const parts = cleanName.split('–').map(p => p.trim());
+          cleanName = parts.find(part => !/\d/.test(part)) || parts[0];
+        }
+
+        const rawMatch = cleanName.match(/[\u0E00-\u0E7F]+/g);
+        const thaiOnlyMatch = rawMatch ? rawMatch.filter(s => s.trim() !== '') : [];
+        if (thaiOnlyMatch.length > 0) {
+          cleanName = thaiOnlyMatch.join(' ').replace(/\s{2,}/g, ' ').trim();
+          cleanName = cleanName.replace(/ซับไทย|ซับอังกฤษ/gi, '').trim();
+          cleanName = cleanName.replace(/บรรยายไทย|เต็มเรื่อง|ดููหนัง|เดอะซีรี่ส์/gi, '').trim();
+        }
+
+        const res = await fetch(`${TMDB_BASE_URL}?api_key=${TMDB_API_KEY}&language=th-TH&query=${encodeURIComponent(cleanName)}`);
+        const data = await res.json();
+        const result = data.results?.[0] || null;
+        if (!result) return null;
+
+        const creditRes = await fetch(`https://api.themoviedb.org/3/${result.media_type}/${result.id}/credits?api_key=${TMDB_API_KEY}&language=th-TH`);
+        const creditData = await creditRes.json();
+        result.castList = (creditData.cast || []).filter(actor => actor.profile_path).slice(0, 6).map(actor => ({
+          name: actor.name, profile: `https://image.tmdb.org/t/p/w185${actor.profile_path}`
+        }));
+
+        const detailRes = await fetch(`https://api.themoviedb.org/3/${result.media_type}/${result.id}?api_key=${TMDB_API_KEY}&language=th-TH`);
+        const detailData = await detailRes.json();
+        result.runtime = detailData.runtime || null;
+        result.genres = detailData.genres?.map(g => g.name).join(', ') || '';
+
+        return result;
+      } catch (e) { return null; }
+    }
+
+    async function lazyFetchRating(name, index) {
+      const badgeEl = document.getElementById(`rating-${index}`);
+      if (!badgeEl) return;
+      try {
+        const tmdb = await fetchTmdbDetail(name);
+        let rating = tmdb && typeof tmdb.vote_average === 'number' ? tmdb.vote_average : 0;
+        const color = rating >= 7 ? '#4ade80' : rating >= 4 ? '#facc15' : '#f87171';
+        badgeEl.textContent = `★ ${rating.toFixed(1)}`;
+        badgeEl.style.backgroundColor = color;
+        badgeEl.style.color = '#000';
+      } catch (e) {
+        badgeEl.textContent = '★ 0.0';
+        badgeEl.style.backgroundColor = '#555';
+      }
+    }
+
+    function renderChannelsPage(page = 1) {
+      const container = document.getElementById('channelContainer');
+      const start = (page - 1) * PAGE_SIZE;
+      const paged = channels.slice(start, start + PAGE_SIZE);
+
+      const html = `
+        <div class="section-title">✨ ${isTvModeActive ? 'ช่องทีวีพรีเมียมออนไลน์' : 'ซีรีส์และหนัง'}</div>
+        <div class="channel-list">
+          ${paged.map((ch, idx) => `
+            <div class="channel-card" onclick="onChannelClick(${start + idx})">
+              <img src="/proxy-image?url=${encodeURIComponent(ch.logo)}" alt="${ch.name}" onerror="this.onerror=null;this.src='${ch.logo}'"/>
+              <div class="rating-badge" id="rating-${start + idx}"></div>
+              <div class="title">${ch.name} ${ch.ep ? `<div style="font-size:0.8em;color:#aaa;">EP ${ch.ep}</div>` : ''}</div>
+            </div>
+          `).join('')}
+        </div>
+        ${renderPagination(page)}
+      `;
+      container.innerHTML = html;
+      paged.forEach((ch, idx) => lazyFetchRating(ch.name, start + idx));
+    }
+
+    function renderPagination(page) {
+      const totalPages = Math.ceil(channels.length / PAGE_SIZE);
+      if (totalPages <= 1) return '';
+      let html = '<div class="pagination">';
+      if (page > 1) {
+        html += `<button onclick="gotoPage(1)">หน้าแรก</button>`;
+        html += `<button onclick="gotoPage(${page - 1})">ย้อนกลับ</button>`;
+      }
+      for (let i = 1; i <= totalPages; i++) {
+        html += `<button class="${i === page ? 'active' : ''}" onclick="gotoPage(${i})">${i}</button>`;
+      }
+      if (page < totalPages) {
+        html += `<button onclick="gotoPage(${page + 1})">ถัดไป</button>`;
+      }
+      html += '</div>';
+      return html;
+    }
+
+    function gotoPage(page) { currentPage = page; renderChannelsPage(page); }
+    function renderRatingStars(rating) { return `<span style="color:#facc15;font-weight:bold">★ ${rating.toFixed(2)}</span>`; }
+
+    // ป๊อปอัพเรียกเล่น
+    function showLoadingDialog() {
+      document.getElementById('dialogContainer').innerHTML = `<div class="dialog-overlay"><div class="dialog"><h2>⌛ กำลังโหลดข้อมูลรายละเอียด...</h2></div></div>`;
+    }
+
+    async function onChannelClick(index) {
+      const ch = channels[index];
+      showLoadingDialog();
+      let tmdb = await fetchTmdbDetail(ch.name);
+      const episodes = ch.episodes || [];
+      let episodeButtons = '';
+
+      if (episodes.length > 0) {
+        episodeButtons = episodes.map((ep, i) => {
+          const key = `${ch.name}-ep${i+1}`;
+          const watched = watchedEpisodes[key];
+          return `<button onclick="alert('เปิดการเล่น: ${ep.url}')" class="${watched ? 'watched' : ''}">ตอน ${ep.ep}</button>`;
+        }).join('');
+      } else if (ch.url) {
+        episodeButtons = `<button onclick="alert('กำลังเปิดลิงก์: ${ch.url}')">▶️ เล่นเลย</button>`;
+      }
+
+      document.getElementById('dialogContainer').innerHTML = `
+        <div class="dialog-overlay">
+          <div class="dialog">
+            <button class="close-btn" onclick="document.getElementById('dialogContainer').innerHTML=''">❌</button>
+            <h2>${ch.name}</h2>
+            <p class="info">ประเภท: ${tmdb?.genres || 'ทีวีออนไลน์'}</p>
+            <p class="desc">${tmdb?.overview || 'รับชมความบันเทิงแบบสดๆ หรือตอนย้อนหลังได้ทันที'}</p>
+            <div class="episode-list">${episodeButtons}</div>
+          </div>
+        </div>`;
+    }
+  </script>
+</body>
+</html>

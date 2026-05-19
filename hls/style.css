@@ -1,0 +1,22 @@
+/* การนำเข้าฟอนต์ */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+body {
+    font-family: 'Inter', sans-serif;
+}
+
+/* 1. Custom Scrollbar สำหรับรายการหนังที่เลื่อนได้ */
+.horizontal-scroll-container::-webkit-scrollbar {
+    height: 8px;
+}
+.horizontal-scroll-container::-webkit-scrollbar-thumb {
+    background-color: #ef4444; /* red-500 */
+    border-radius: 4px;
+}
+.horizontal-scroll-container::-webkit-scrollbar-track {
+    background: #1f2937; /* gray-800 */
+}
+
+/* 2. Card Hover Effect: แสดงชื่อเรื่องซ้อนทับเมื่อเมาส์วางอยู่ */
+.poster-card:hover .title-overlay {
+    opacity: 1;
+}

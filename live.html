@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>M3U Generator: livescore_football.m3u</title>
+  <style>
+    :root { --primary: #00e676; --bg: #0a0a0a; --panel: #161616; }
+    body { font-family: 'Inter', sans-serif; background: var(--bg); color: #fff; margin: 0; padding: 20px; display: flex; justify-content: center; }
+    .card { width: 100%; max-width: 800px; background: var(--panel); border-radius: 15px; padding: 30px; box-shadow: 0 20px 40px rgba(0,0,0,0.6); border: 1px solid #333; }
+    h1 { font-size: 24px; color: var(--primary); margin-bottom: 5px; text-align: center; }
+    p.subtitle { text-align: center; color: #888; margin-bottom: 25px; }
+    .status-box { background: #000; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid var(--primary); display: flex; justify-content: space-between; align-items: center; }
+    pre { background: #000; color: #00ff41; padding: 20px; border-radius: 10px; overflow-x: auto; font-size: 13px; max-height: 450px; border: 1px solid #222; line-height: 1.5; }
+    .actions { display: flex; gap: 15px; margin-top: 20px; }
+    button { flex: 1; padding: 15px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 16px; transition: 0.3s; }
+    .btn-download { background: var(--primary); color: #000; }
+    .btn-download:hover { background: #00c853; transform: translateY(-2px); }
+    .btn-refresh { background: #222; color: #fff; border: 1px solid #444; }
+    .btn-refresh:hover { background: #333; }
+    .loading { color: var(--primary); font-style: italic; }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <h1>⚽ Football M3U Generator</h1>
+  <p class="subtitle">ไฟล์เป้าหมาย: livescore_football.m3u</p>
+
+  <div class="status-box">
+    <span id="status">กำลังรอข้อมูล...</span>
+    <span id="matchCount" style="color: var(--primary); font-weight: bold;">0 คู่</span>
+  </div>
+
+  <pre id="m3uPreview">#EXTM3U ... (รอการดึงข้อมูล)</pre>
+
+  <div class="actions">
+    <button class="btn-refresh" onclick="fetchAndGenerate()">🔄 ดึงข้อมูลใหม่</button>
+    <button class="btn-download" id="dlBtn" disabled>📥 ดาวน์โหลดไฟล์ .m3u</button>
+  </div>
+</div>
+  <script>
+async function fetchViaProxy(url) {
+  const proxyUrl = `/api/proxy?url=${encodeURIComponent(url)}`;
+  const res = await fetch(proxyUrl);
+  if (!res.ok) return null;
+  return await res.text();
+}
+  
+    const API_URL = "https://api-soccer.thai-play.com/api/v4/iptv/livescore/now?token=JF6pHMnpVCRUeEsSqAAjTWA4GbGhMrpD";
+    let currentM3U = "";
+
+    async function fetchAndGenerate() {
+      const status = document.getElementById("status");
+      const count = document.getElementById("matchCount");
+      const preview = document.getElementById("m3uPreview");
+      const dlBtn = document.getElementById("dlBtn");
+
+      status.innerHTML = '<span class="loading">⏳ กำลังเชื่อมต่อ API...</span>';
+      dlBtn.disabled = true;
+
+      try {
+        const res = await fetch(API_URL);
+        const htmlText = await res.text();
+
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(htmlText, "text/html");
+        const containers = doc.querySelectorAll("div.row.gy-3");
+
+        let m3u = "#EXTM3U\n";
+        let matchesFound = 0;
+
+        containers.forEach(container => {
+          const statusNode = container.querySelector("div.col-lg-1 div");
+          const statusText = statusNode ? statusNode.textContent.trim() : "";
+
+          // ข้ามแมตช์ที่จบแล้ว (FT)
+          if (statusText.toUpperCase() === "FT") return;
+
+          const time = statusText.replace(/(\d{1,2}):(\d{2})/, "$1.$2");
+          const home = container.querySelector("div.text-end p")?.textContent.trim() || "Home";
+          const away = container.querySelector("div.text-start p")?.textContent.trim() || "Away";
+          
+          // ดึงชื่อลีก
+          let league = "LIVE FOOTBALL";
+          const parent = container.closest('.mb-5');
+          if (parent) {
+            const leagueNode = parent.querySelector("strong.text-uppercase");
+            if (leagueNode) league = leagueNode.textContent.trim().replace("|", ":");
+          }
+
+          const streams = container.querySelectorAll("img.iam-list-tv");
+          streams.forEach(stream => {
+            const channel = stream.getAttribute("alt") || "Live TV";
+            let url = stream.getAttribute("data-url");
+            const logo = stream.getAttribute("src");
+
+            if (url) {
+              matchesFound++;
+              // แก้ไข URL ตามต้องการ
+              url = url.replace(":443", "").replace("/dooballfree-com/", "/do-ball.com/");
+              
+              const info = `${league} | ${time} | ${home} vs ${away} (${channel})`;
+              m3u += `#EXTINF:-1 tvg-logo="${logo}" group-title="${league}", ${info}\n`;
+              m3u += `${url}\n`;
+            }
+          });
+        });
+
+        currentM3U = m3u;
+        preview.textContent = m3u;
+        count.textContent = `${matchesFound} รายการ`;
+        status.textContent = "✅ สร้างไฟล์สำเร็จ";
+        
+        if (matchesFound > 0) {
+          dlBtn.disabled = false;
+          dlBtn.onclick = () => {
+            const blob = new Blob([currentM3U], { type: "text/plain" });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = "livescore_football.m3u";
+            link.click();
+          };
+        }
+
+      } catch (err) {
+        status.textContent = "❌ ข้อผิดพลาด: " + err.message;
+        preview.textContent = "ไม่สามารถสร้างไฟล์ได้";
+      }
+    }
+
+    // ทำงานทันทีที่เปิดหน้า
+    fetchAndGenerate();
+</script>
+</body>
+</html>

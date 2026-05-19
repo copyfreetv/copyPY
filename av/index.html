@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    
+    <meta name="referrer" content="no-referrer">
+    <title>JAV STREAMING PRO</title>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Video.js -->
+    <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
+    <script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            bg: '#0a0a0a',
+                            card: '#141414',
+                            accent: '#e50914',
+                            text: '#ffffff',
+                            muted: '#a3a3a3',
+                            dark: '#000000'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        body { background-color: #0a0a0a; color: #ffffff; font-family: 'Inter', 'Sarabun', sans-serif; }
+        .vjs-theme-modern .vjs-big-play-button {
+            background-color: rgba(229, 9, 20, 0.8);
+            border: none; border-radius: 50%; width: 2.5em; height: 2.5em; line-height: 2.5em;
+        }
+        .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0a0a0a; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #e50914; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo } = React;
+
+        /* --- CONFIG & PROXY --- */
+        const PROXY_BASE = "https://jav-proxy.champza55.workers.dev/proxy";
+        const PROXY_KEY  = "JAV-TH_BY_IDOL-CHAMP_2530";
+        const DEFAULT_M3U = "https://dl.dropbox.com/scl/fi/2wgrahh3b1d8s9ppmilgl/JAV.m3u?rlkey=hg2xo38gsmmez3v4msce2jkyn&st=1zp7k2k6&dl=0";
+
+        const FORCE_PROXY_DOMAINS = ["surrit.com", "ezycdn.com", "turboviplay.com", "vdohls.com", "hdplayfull.xyz"];
+
+        const useProxy = (url) => {
+            if (!url) return "";
+            return FORCE_PROXY_DOMAINS.some(d => url.includes(d)) 
+                ? `${PROXY_BASE}?key=${PROXY_KEY}&url=${encodeURIComponent(url)}` 
+                : url;
+        };
+
+        /* --- COMPONENT: VIDEO JS INSTANCE --- */
+        const VideoJSPlayer = ({ src, poster, subtitles }) => {
+            const videoRef = useRef(null);
+            const playerRef = useRef(null);
+
+            useEffect(() => {
+                if (!playerRef.current) {
+                    const videoElement = videoRef.current;
+                    if (!videoElement) return;
+
+                    const player = playerRef.current = videojs(videoElement, {
+                        autoplay: true,
+                        controls: true,
+                        fluid: true,
+                        poster: poster,
+                        sources: [{ src: useProxy(src), type: src.includes('.m3u8') ? 'application/x-mpegURL' : 'video/mp4' }]
+                    });
+
+                    if (subtitles) {
+                        player.addRemoteTextTrack({ kind: 'subtitles', src: subtitles, srclang: 'th', label: 'Thai', default: true }, false);
+                    }
+                } else {
+                    const player = playerRef.current;
+                    player.src({ src: useProxy(src), type: src.includes('.m3u8') ? 'application/x-mpegURL' : 'video/mp4' });
+                }
+            }, [src, poster, subtitles]);
+
+            useEffect(() => {
+                return () => { if (playerRef.current) { playerRef.current.dispose(); playerRef.current = null; } };
+            }, []);
+
+            return <div data-vjs-player><video ref={videoRef} className="video-js vjs-big-play-centered" /></div>;
+        };
+
+        /* --- MAIN APP --- */
+        const App = () => {
+            const [view, setView] = useState('home');
+            const [m3uUrl, setM3uUrl] = useState(localStorage.getItem('saved_m3u') || DEFAULT_M3U);
+            const [videos, setVideos] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [searchTerm, setSearchTerm] = useState('');
+            const [selectedGroup, setSelectedGroup] = useState('All');
+            const [currentVideo, setCurrentVideo] = useState(null);
+
+            useEffect(() => {
+                fetchVideos();
+            }, [m3uUrl]);
+
+            const fetchVideos = async () => {
+                setLoading(true);
+                try {
+                    const res = await fetch(m3uUrl);
+                    const text = await res.text();
+                    const lines = text.split(/\r?\n/);
+                    const result = [];
+                    let current = null;
+
+                    lines.forEach((line, index) => {
+                        line = line.trim();
+                        if (line.startsWith('#EXTINF:')) {
+                            const name = (line.match(/tvg-name="([^"]*)"/) || [])[1] || line.split(',').pop();
+                            const logo = (line.match(/tvg-logo="([^"]*)"/) || [])[1] || '';
+                            const group = (line.match(/group-title="([^"]*)"/) || [])[1] || 'General';
+                            current = { id: index, name, logo, group, link: '' };
+                        } else if (line.startsWith('http')) {
+                            if (current) { current.link = line; result.push(current); current = null; }
+                        }
+                    });
+                    setVideos(result);
+                } catch (e) { console.error(e); }
+                setLoading(false);
+            };
+
+            const groups = useMemo(() => ['All', ...new Set(videos.map(v => v.group))].sort(), [videos]);
+            const filtered = videos.filter(v => 
+                (selectedGroup === 'All' || v.group === selectedGroup) && 
+                v.name.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+
+            return (
+                <div className="min-h-screen flex flex-col">
+                    {/* Header */}
+                    <nav className="bg-brand-card/90 backdrop-blur-md sticky top-0 z-40 border-b border-white/10 px-4 py-3">
+                        <div className="container mx-auto flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-8">
+                                <h1 className="text-2xl font-black text-brand-accent tracking-tighter cursor-pointer" onClick={() => setView('home')}>JAV<span className="text-white">STREAM</span></h1>
+                                <div className="hidden md:flex gap-6 text-sm font-bold uppercase tracking-widest">
+                                    <button onClick={() => setView('home')} className={view === 'home' ? 'text-brand-accent' : 'text-gray-400'}>Home</button>
+                                    <button onClick={() => setView('manage')} className={view === 'manage' ? 'text-brand-accent' : 'text-gray-400'}>Settings</button>
+                                </div>
+                            </div>
+                            <div className="flex-1 max-w-sm relative">
+                                <input className="w-full bg-white/5 border border-white/10 rounded-full py-2 px-10 text-sm focus:border-brand-accent outline-none" placeholder="Search movies..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                                <i className="fa-solid fa-search absolute left-4 top-2.5 text-gray-500"></i>
+                            </div>
+                        </div>
+                    </nav>
+
+                    {view === 'home' ? (
+                        <div className="container mx-auto px-4 py-8 flex flex-col lg:flex-row gap-8">
+                            <aside className="lg:w-64 space-y-2">
+                                <p className="text-xs font-black text-gray-500 mb-4 px-2 uppercase">Categories</p>
+                                {groups.map(g => (
+                                    <button key={g} onClick={() => setSelectedGroup(g)} className={`w-full text-left px-4 py-2 rounded-lg text-sm transition ${selectedGroup === g ? 'bg-brand-accent text-white' : 'text-gray-400 hover:bg-white/5'}`}>{g}</button>
+                                ))}
+                            </aside>
+
+                            <main className="flex-1">
+                                {loading ? (
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6 animate-pulse">
+                                        {[...Array(8)].map((_, i) => <div key={i} className="aspect-[2/3] bg-white/5 rounded-xl"></div>)}
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                                        {filtered.map(v => (
+                                            <div key={v.id} className="group cursor-pointer" onClick={() => setCurrentVideo(v)}>
+                                                <div className="relative aspect-[2/3] rounded-xl overflow-hidden mb-2 border border-white/5 group-hover:border-brand-accent/50 transition">
+                                                    <img src={v.logo} className="w-full h-full object-cover group-hover:scale-110 transition duration-500" />
+                                                    <div className="absolute inset-0 bg-gradient-to-t from-black to-transparent opacity-60"></div>
+                                                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
+                                                        <i className="fa-solid fa-play bg-brand-accent w-12 h-12 rounded-full flex items-center justify-center pl-1"></i>
+                                                    </div>
+                                                </div>
+                                                <h4 className="text-sm font-bold line-clamp-2">{v.name}</h4>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </main>
+                        </div>
+                    ) : (
+                        /* Page 2: Manage */
+                        <div className="container mx-auto px-4 py-20 max-w-xl text-center">
+                            <i className="fa-solid fa-gear text-6xl text-brand-accent mb-6"></i>
+                            <h2 className="text-3xl font-black mb-2">Playlist Settings</h2>
+                            <p className="text-gray-500 mb-8">ใส่ลิงก์ไฟล์ M3U ของคุณเพื่อเปลี่ยนรายการหนัง</p>
+                            <input className="w-full bg-white/5 border border-white/10 rounded-xl p-4 mb-4 focus:border-brand-accent outline-none" value={m3uUrl} onChange={e => setM3uUrl(e.target.value)} />
+                            <div className="flex gap-4">
+                                <button className="flex-1 bg-brand-accent py-4 rounded-xl font-bold" onClick={() => { localStorage.setItem('saved_m3u', m3uUrl); setView('home'); }}>Save Changes</button>
+                                <button className="bg-white/10 px-6 py-4 rounded-xl font-bold" onClick={() => { setM3uUrl(DEFAULT_M3U); localStorage.removeItem('saved_m3u'); }}>Reset</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Player Modal */}
+                    {currentVideo && (
+                        <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4">
+                            <div className="w-full max-w-5xl">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="font-bold truncate pr-8">{currentVideo.name}</h3>
+                                    <button onClick={() => setCurrentVideo(null)} className="text-2xl hover:text-brand-accent">&times;</button>
+                                </div>
+                                <div className="rounded-2xl overflow-hidden bg-black shadow-2xl border border-white/10">
+                                    <VideoJSPlayer src={currentVideo.link} poster={currentVideo.logo} />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

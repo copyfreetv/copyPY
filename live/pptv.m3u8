@@ -1,0 +1,5 @@
+#EXTM3U
+#EXT-X-VERSION:3
+#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="aac",LANGUAGE="default",NAME="DEFAULT",DEFAULT=YES,AUTOSELECT=NO,URI="https://cdn139.stm.trueid.net/p101aes/c03_multi_w_auto_tidapp.smil/chunklist_w1526565899_b96000_ao_sltha_t64VGhhaQ==.m3u8?appid=trueid&type=live&visitor=web&drm=aes&uid=20566943&did=czJXZVVPOUdoR1hKNFFGU1g4UFgzemNJWDZieDNUUk0&mpass=ukiEu0RAY9a_uqmklRJ2iOViHrw5yZ7vP1rkAIfWjq3iEEv88YOWE9kAweONNrbF2rxv0cNPsj4aXpym8JS2LoXYQTTKJmmq54naqsASi7orEsqewlRhS0lPS9jcM4G3ICAXtnnGhdZl2qCJk7k2Kkb2&sid=28df01448f&rt=1778447338&ds=25200&tk=g8-ag4-tYtRzJdSACiU4eRZ2qKGZCg-OEOf4RGbD4Vc"
+#EXT-X-STREAM-INF:BANDWIDTH=2500000,RESOLUTION=1280x720,CODECS="avc1.4d401e,mp4a.40.2",AUDIO="aac"
+https://cdn145.stm.trueid.net/p201dai/he005_multi_w_auto_tidapp.smil/chunklist_w1220966476_b2200000_vo_t64TWFpbg==.m3u8?appid=trueid&type=live&visitor=web&drm=aes&uid=20566943&did=czJXZVVPOUdoR1hKNFFGU1g4UFgzemNJWDZieDNUUk0&mpass=cbW6XWdYFuhG7YVTZbKJY6fEkln0QrC0SgFbHD0w5QrAydX8B-YeaHGvy5bHwatqXx3_Iv7DwE5z6RLVlaAeoT9t6tujShZYLQ9B06RcuwKF9Cc7W640tSN5KnbE-7SpICCtp2bTluzid7LCiXo9-OQh&sid=758944231d&rt=1778448870&ds=25200&tk=zj6nV-_2TPWWTMih9ani0Z15kXUkEBuyZzzt5FdQP94

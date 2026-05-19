@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Movie Player PRO</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-[#141414] text-white font-sans">
+
+<header id="mainHeader" class="bg-[#141414] shadow-lg">
+  <div class="container mx-auto px-4 py-4">
+    <a href="../movie.html" class="text-3xl font-extrabold text-[#E50914]">
+      FLIX <span class="text-white">Movie</span>
+    </a>
+  </div>
+</header>
+
+<main class="relative w-full h-screen bg-black overflow-hidden group">
+  <video id="my-video" class="w-full h-full object-contain bg-black" playsinline preload="auto"></video>
+
+  <div id="seekOverlay" class="absolute inset-0 flex items-center justify-center text-white text-4xl font-bold pointer-events-none opacity-0 transition-opacity duration-200 z-50"></div>
+
+  <!-- CONTROL BAR -->
+  <div id="controlBar" class="absolute bottom-0 left-0 w-full px-6 pb-6 pt-10 bg-gradient-to-t from-black/90 via-black/60 to-transparent opacity-100 transition-opacity duration-300 z-40">
+    <div class="mb-4">
+      <input id="progress" type="range" value="0" min="0" max="100" class="w-full accent-red-600 cursor-pointer">
+    </div>
+
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-4">
+        <button id="playPause" class="text-2xl">▶</button>
+        <span id="timeDisplay" class="text-sm opacity-80">00:00 / 00:00</span>
+        <input id="volume" type="range" min="0" max="1" step="0.05" value="1" class="w-24 accent-white cursor-pointer">
+        <select id="subtitleSelect" class="bg-transparent border border-gray-500 rounded px-2 py-1 text-sm">
+          <option value="">Subtitles</option>
+        </select>
+        <select id="audioSelect" class="bg-transparent border border-gray-500 rounded px-2 py-1 text-sm">
+          <option value="">Audio</option>
+        </select>
+      </div>
+
+      <div class="flex items-center gap-4">
+        <select id="speedControl" class="bg-transparent border border-gray-500 rounded px-2 py-1 text-sm">
+          <option value="0.5">0.5x</option>
+          <option value="1" selected>1x</option>
+          <option value="1.5">1.5x</option>
+          <option value="2">2x</option>
+        </select>
+        <button id="fullscreenBtn" class="text-xl">⛶</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOP BAR -->
+  <div id="topBar" class="absolute top-0 left-0 w-full flex justify-between items-center p-5 z-30 transition-opacity duration-300 opacity-100">
+    <a href="../movie.html" class="text-white text-sm font-semibold bg-black/60 px-4 py-2 rounded hover:bg-black">← ย้อนกลับ</a>
+    <button id="reloadBtn" class="text-white text-sm font-semibold bg-red-600/80 px-4 py-2 rounded hover:bg-red-600">โหลดซ้ำ</button>
+  </div>
+
+  <!-- TITLE -->
+  <div id="bottomBar" class="absolute left-0 w-full px-6 z-30 transition-opacity duration-300 opacity-100" style="bottom:110px;">
+    <h1 id="videoTitle" class="text-2xl md:text-4xl font-extrabold text-white drop-shadow-2xl">กำลังโหลด...</h1>
+    <p id="videoPlot" class="text-gray-300 mt-2 text-sm"></p>
+  </div>
+
+  <!-- Skip / Next -->
+  <button id="skipIntro" class="absolute bottom-24 right-32 bg-white text-black px-4 py-2 rounded font-semibold hidden z-40">ข้ามอินโทร</button>
+  <button id="nextBtn" class="absolute bottom-24 right-8 bg-red-600 text-white px-4 py-2 rounded font-semibold hidden z-40">ดูเรื่องถัดไป</button>
+</main>
+
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+  const params = new URLSearchParams(window.location.search);
+  const file = params.get("file");
+  const id = params.get("id");
+
+  const video = document.getElementById("my-video");
+  const title = document.getElementById("videoTitle");
+  const plot = document.getElementById("videoPlot");
+  const subtitleSelect = document.getElementById("subtitleSelect");
+  const audioSelect = document.getElementById("audioSelect");
+  const skipIntro = document.getElementById("skipIntro");
+  const nextBtn = document.getElementById("nextBtn");
+
+  if (!file || !id) { title.textContent="ไม่พบข้อมูลหนัง"; return; }
+
+  try {
+    const res = await fetch(`playlist/${file}.json`);
+    const movies = await res.json();
+    const movie = movies.find(m=>m.id===id);
+
+    if (!movie) { title.textContent="ไม่พบหนังในระบบ"; return; }
+
+    document.title = movie.name;
+    title.textContent = movie.name;
+    plot.textContent = movie.info?.plot || "";
+
+    // ======================
+    // LOAD VIDEO
+    // ======================
+    function loadVideo(videoUrl){
+      if(!videoUrl) return;
+      if(videoUrl.endsWith(".m3u8")){
+        if(video.canPlayType('application/vnd.apple.mpegurl')){
+          video.src = videoUrl;
+          video.load();
+          video.play().catch(()=>{});
+        } else {
+          alert("ไฟล์ .m3u8 เล่นไม่ได้บน browser นี้ โปรดใช้ Safari หรือแปลงเป็น MP4");
+        }
+      } else {
+        video.src = videoUrl;
+        video.load();
+        video.play().catch(()=>{});
+      }
+    }
+    loadVideo(movie.video || movie.url || movie.file);
+
+    // ======================
+    // SUBTITLES
+    // ======================
+    if(movie.subtitles?.length){
+      subtitleSelect.innerHTML='<option value="">Subtitles</option>';
+      movie.subtitles.forEach((sub,i)=>{
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.text = sub.lang;
+        subtitleSelect.appendChild(opt);
+        const track = document.createElement("track");
+        track.kind="subtitles";
+        track.label=sub.lang;
+        track.srclang=sub.lang;
+        track.src=sub.url;
+        track.default = i===0;
+        video.appendChild(track);
+      });
+      subtitleSelect.onchange = () => {
+        const index = subtitleSelect.value;
+        Array.from(video.textTracks).forEach((t,i)=>t.mode=i==index?"showing":"disabled");
+      };
+    }
+
+    // ======================
+    // AUDIO TRACKS
+    // ======================
+    if(movie.audioTracks?.length){
+      audioSelect.innerHTML='<option value="">Audio</option>';
+      movie.audioTracks.forEach((at,i)=>{
+        const opt = document.createElement('option');
+        opt.value=i;
+        opt.text=at.lang;
+        audioSelect.appendChild(opt);
+      });
+      audioSelect.onchange = () => {
+        const index = audioSelect.value;
+        if(index==="") return;
+        const selected = movie.audioTracks[index];
+        loadVideo(selected.url);
+      };
+    }
+
+    // ======================
+    // SKIP / NEXT
+    // ======================
+    if(movie.skipIntro){
+      skipIntro.classList.remove("hidden");
+      skipIntro.onclick = () => video.currentTime = movie.skipIntro;
+    } else skipIntro.classList.add("hidden");
+
+    if(movie.next){
+      nextBtn.classList.remove("hidden");
+      nextBtn.onclick = () => window.location.href=`player.html?file=${file}&id=${movie.next}`;
+    } else nextBtn.classList.add("hidden");
+
+    // ======================
+    // UI CONTROLS
+    // ======================
+    const playPause = document.getElementById("playPause");
+    const progress = document.getElementById("progress");
+    const volume = document.getElementById("volume");
+    const timeDisplay = document.getElementById("timeDisplay");
+    const fullscreenBtn = document.getElementById("fullscreenBtn");
+    const controlBar = document.getElementById("controlBar");
+    const topBar = document.getElementById("topBar");
+    const bottomBar = document.getElementById("bottomBar");
+    const seekOverlay = document.getElementById("seekOverlay");
+
+    function togglePlay(){ video.paused ? video.play() : video.pause(); }
+    playPause.onclick = togglePlay;
+    video.onplay = ()=>playPause.textContent="❚❚";
+    video.onpause = ()=>playPause.textContent="▶";
+
+    video.addEventListener("timeupdate", ()=>{
+      if(!video.duration) return;
+      progress.value = (video.currentTime/video.duration)*100;
+      timeDisplay.textContent = formatTime(video.currentTime)+" / "+formatTime(video.duration);
+      if(movie.skipIntro) skipIntro.classList.toggle("hidden", !(video.currentTime>5 && video.currentTime<movie.skipIntro));
+      if(movie.next) nextBtn.classList.toggle("hidden", !(video.duration-video.currentTime<20));
+    });
+
+    progress.oninput = ()=>video.currentTime=(progress.value/100)*video.duration;
+    volume.oninput = ()=>video.volume=volume.value;
+    document.getElementById("reloadBtn").onclick = (e)=>{ e.preventDefault(); location.reload(); };
+
+    fullscreenBtn.onclick = () => {
+      if(!document.fullscreenElement) document.documentElement.requestFullscreen();
+      else document.exitFullscreen();
+    };
+
+    document.addEventListener("keydown",(e)=>{
+      if(e.code==="Space"){ e.preventDefault(); togglePlay(); }
+      if(e.code==="ArrowRight") seek(5);
+      if(e.code==="ArrowLeft") seek(-5);
+      if(e.key==="f"||e.key==="F") fullscreenBtn.click();
+    });
+
+    function seek(sec){ video.currentTime=Math.max(0,Math.min(video.duration,video.currentTime+sec)); showSeekOverlay(sec>0?`+${sec}s`:`${sec}s`); }
+    function showSeekOverlay(text){ seekOverlay.textContent=text; seekOverlay.style.opacity="1"; setTimeout(()=>seekOverlay.style.opacity="0",500); }
+    function formatTime(s){ if(!s||isNaN(s)) return "00:00"; const m=Math.floor(s/60); const sec=Math.floor(s%60); return `${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`; }
+
+    // Auto hide UI
+    let hideTimeout;
+    function showUI(){ 
+      controlBar.style.opacity="1"; topBar.style.opacity="1"; bottomBar.style.opacity="1"; 
+      clearTimeout(hideTimeout); 
+      hideTimeout=setTimeout(()=>{ if(!video.paused){ controlBar.style.opacity="0"; topBar.style.opacity="0"; bottomBar.style.opacity="0"; } },3000); 
+    }
+    document.addEventListener("mousemove",showUI);
+    document.addEventListener("touchstart",showUI);
+
+    // DOUBLE TAP SEEK
+    let lastTap = 0;
+    video.addEventListener("touchend", (e)=>{
+      const now = Date.now();
+      if(now-lastTap<300){
+        const x=e.changedTouches[0].clientX;
+        const half=window.innerWidth/2;
+        seek(x<half?-10:10);
+      }
+      lastTap = now;
+    });
+
+  } catch(err){
+    title.textContent="โหลดข้อมูลล้มเหลว";
+    console.error(err);
+  }
+});
+</script>
+
+</body>
+</html>
