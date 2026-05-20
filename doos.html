@@ -7,6 +7,7 @@
 <title>Doo-Nang Series Parser</title>
 
 <style>
+
 :root{
   --green:#63ff00;
   --bg:#0f0f0f;
@@ -177,13 +178,6 @@ JSON Data
 
 <script>
 
-const nationMap = {
-  TH:"ซีรีส์ ไทย",
-  KR:"ซีรีส์ เกาหลี",
-  JP:"ซีรีส์ ญี่ปุ่น",
-  US:"ซีรีส์ อเมริกา"
-};
-
 
 
 // ======================================
@@ -215,7 +209,7 @@ function extractAudioTracks(text){
 
 
 // ======================================
-// Parse Quality URL
+// Parse Best Quality
 // ======================================
 
 function parseBestQuality(m3u8Text){
@@ -257,14 +251,11 @@ async function processEpisode(ep){
   const transcodeUuid =
   ep.video?.transcodeUuid;
 
-  const cdnHostname =
-  ep.video?.cdnHostname;
-
   let videoUrl = "";
 
   let audioTracks = [];
 
-  if(transcodeUuid && cdnHostname){
+  if(transcodeUuid){
 
     const masterUrl =
     `https://api.doo-nang.com/video/${transcodeUuid}/playlist.m3u8`;
@@ -344,9 +335,7 @@ show(id:$id){
 id
 titleTh
 titleEn
-nation
 posterUrl
-releaseDate
 
 episodes{
 
@@ -358,7 +347,6 @@ posterUrl
 
 video{
 transcodeUuid
-cdnHostname
 }
 
 }
@@ -398,58 +386,121 @@ cdnHostname
 
   }
 
-  const data = {
 
-    id:show.id,
+
+  // ======================================
+  // JSON FORMAT
+  // ======================================
+
+  const data = {
 
     name:
     show.titleTh ||
     show.titleEn,
 
-    poster:
+    image:
     show.posterUrl,
 
-    category:
-    nationMap[show.nation] ||
-    "ซีรีส์",
-
-    seasons:[]
+    stations:[]
 
   };
 
-  const seasonMap = {};
+
+
+  const episodes =
+  show.episodes || [];
+
+  const totalEp =
+  episodes.length;
+
+
 
   const tasks =
-  (show.episodes || []).map(async ep=>{
-
-    const seasonNo =
-    parseInt(ep.seasonNo || 1);
+  episodes.map(async ep=>{
 
     const processed =
     await processEpisode(ep);
 
-    if(!seasonMap[seasonNo]){
+    let info =
+    `HD | พากย์ไทย | EP 1 - ${totalEp}`;
 
-      seasonMap[seasonNo] = {
 
-        season:seasonNo,
 
-        episodes:[]
+    if(
+      processed.audioTracks &&
+      processed.audioTracks.length > 0
+    ){
 
-      };
+      const langs =
+      processed.audioTracks
+      .map(a=>a.language)
+      .join(",");
+
+      if(
+        langs.includes("th")
+      ){
+
+        info =
+        `HD | พากย์ไทย | EP 1 - ${totalEp}`;
+
+      }else{
+
+        info =
+        `HD | Soundtrack/ซับไทย | EP 1 - ${totalEp}`;
+
+      }
 
     }
 
-    seasonMap[seasonNo]
-    .episodes
-    .push(processed);
+
+
+    data.stations.push({
+
+      name:
+      `EP.${String(processed.episode).padStart(2,"0")}`,
+
+      image:
+      processed.poster ||
+      show.posterUrl,
+
+      url:
+      processed.video,
+
+      referer:"",
+
+      info:info,
+
+      playInNatPlayer:"true"
+
+    });
 
   });
 
+
+
   await Promise.all(tasks);
 
-  data.seasons =
-  Object.values(seasonMap);
+
+
+  data.stations.sort(
+    (a,b)=>{
+
+      const epA =
+      parseInt(
+        a.name.replace("EP.","")
+      );
+
+      const epB =
+      parseInt(
+        b.name.replace("EP.","")
+      );
+
+      return epA - epB;
+
+    }
+  );
+
+
 
   return data;
 
@@ -465,33 +516,15 @@ function generateM3U(data){
 
   let m3u = "#EXTM3U\n\n";
 
-  data.seasons.forEach(season=>{
+  data.stations.forEach(ep=>{
 
-    season.episodes.sort(
-      (a,b)=>a.episode-b.episode
-    );
-
-    season.episodes.forEach(ep=>{
-
-      if(!ep.video) return;
-
-      const S =
-      String(season.season)
-      .padStart(2,"0");
-
-      const E =
-      String(ep.episode)
-      .padStart(2,"0");
-
-      m3u +=
-`#EXTINF:-1 type="series" group-title="${data.name}" tvg-logo="${data.poster}",${data.name} S${S}E${E} - ${ep.title}
+    m3u +=
+`#EXTINF:-1 tvg-logo="${ep.image}" group-title="${data.name}",${ep.name}
 #EXTVLCOPT:http-referrer=https://www.doo-nang.com/
 #EXTVLCOPT:http-origin=https://www.doo-nang.com
-${ep.video}
+${ep.url}
 
 `;
-
-    });
 
   });
 
