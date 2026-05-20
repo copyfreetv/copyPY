@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <title>ระบบดึงข้อมูล 24-HDS Pro</title>
+    <title>ระบบดึงข้อมูล 24-HDS (Updated)</title>
     <style>
         body { font-family: 'Tahoma', sans-serif; background: #0f0f0f; color: #fff; padding: 20px; }
         .container { max-width: 1200px; margin: 0 auto; }
@@ -18,9 +18,10 @@
 <body>
 
 <div class="container">
-    <h1 style="text-align:center; color: #ffeb3b;">ระบบดึงข้อมูล 24-HDS (Fix)</h1>
+    <h1 style="text-align:center; color: #ffeb3b;">ระบบดึงข้อมูล 24-HDS (Updated)</h1>
     <div class="control-panel">
-        <input type="number" id="startPage" value="1" style="width:50px;"> ถึง <input type="number" id="endPage" value="1" style="width:50px;">
+        <input type="number" id="startPage" value="1" style="width:50px;"> ถึง 
+        <input type="number" id="endPage" value="1" style="width:50px;">
         <button onclick="startHarvesting()">🚀 เริ่มดึงข้อมูล</button>
         <div id="loader" style="margin-top:10px;">📍 พร้อมทำงาน</div>
     </div>
@@ -47,12 +48,12 @@ async function startHarvesting() {
 
     for (let p = start; p <= end; p++) {
         loader.textContent = `🔍 กำลังสแกนหน้า: ${p}`;
-        // ปรับ URL หมวดหมู่หนังใหม่
+        // ปรับ URL หมวดหมู่ตามที่ให้มา
         const pageUrl = p === 1 ? `${BASE_URL}/หนังใหม่-2026/` : `${BASE_URL}/หนังใหม่-2026/page/${p}/`;
         const html = await request(pageUrl);
         if(!html) continue;
 
-        // Regex จับลิงก์จากโครงสร้าง 24-hds
+        // Regex ปรับให้ค้นหาจากโครงสร้างลิงก์รายการในหน้าหมวดหมู่
         const regex = /href="(https:\/\/www\.24-hds\.com\/movie\/[^"]+)"/g;
         const matches = [...new Set([...html.matchAll(regex)].map(m => m[1]))];
 
@@ -64,7 +65,7 @@ async function startHarvesting() {
             const title = doc.querySelector("h1.entry-title")?.textContent.trim() || "ไม่ทราบชื่อ";
             const poster = doc.querySelector(".post-thumbnail img")?.src || "";
             
-            // ดึง ID จาก Iframe ของ 24playerhd
+            // ดึง ID จาก iframe เพื่อสร้างลิงก์ M3U8
             const iframe = doc.querySelector("iframe");
             let m3u = "";
             if (iframe && iframe.src.includes("24playerhd.com")) {
