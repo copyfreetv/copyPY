@@ -1,4 +1,3 @@
-```html
 <!DOCTYPE html>
 <html lang="th">
 <head>
@@ -103,10 +102,38 @@ placeholder="วางลิงค์ซีรีย์ เช่น https://www
 
 async function fetchHtml(url){
 
+  const proxy =
+  "/api/proxy?url=";
+
   const res =
-  await fetch(url);
+  await fetch(
+    proxy + encodeURIComponent(url)
+  );
 
   return await res.text();
+
+}
+
+
+
+// =====================================
+// FIND IFRAME
+// =====================================
+
+function findIframe(html){
+
+  const match =
+  html.match(
+    /<iframe[^>]+src="([^"]+)"/i
+  );
+
+  if(match){
+
+    return match[1];
+
+  }
+
+  return "";
 
 }
 
@@ -118,15 +145,47 @@ async function fetchHtml(url){
 
 function findM3U8(html){
 
-  const regex =
-  /https?:\/\/[^"' ]+\.m3u8[^"' ]*/g;
+  // direct
 
-  const match =
-  html.match(regex);
+  let match =
+  html.match(
+    /https?:\/\/[^"' ]+\.m3u8[^"' ]*/g
+  );
 
   if(match){
 
     return match[0];
+
+  }
+
+
+
+  // escaped
+
+  match =
+  html.match(
+    /https?:\\\/\\\/[^"]+\.m3u8[^"]*/g
+  );
+
+  if(match){
+
+    return match[0]
+    .replaceAll("\\/","/");
+
+  }
+
+
+
+  // source:"..."
+
+  match =
+  html.match(
+    /source\s*:\s*"([^"]+\.m3u8[^"]*)"/
+  );
+
+  if(match){
+
+    return match[1];
 
   }
 
@@ -172,7 +231,7 @@ async function parseSeries(url){
 
 
 
-  // episode links
+  // links
 
   const links =
   [...doc.querySelectorAll("a")];
@@ -193,6 +252,8 @@ async function parseSeries(url){
 
 
 
+    // filter
+
     if(
       !text.includes("EP")
       &&
@@ -205,11 +266,53 @@ async function parseSeries(url){
 
     try{
 
+      // ================================
+      // episode page
+      // ================================
+
       const epHtml =
       await fetchHtml(href);
 
+
+
+      // ================================
+      // iframe
+      // ================================
+
+      const iframe =
+      findIframe(epHtml);
+
+      let playerHtml =
+      epHtml;
+
+
+
+      // ================================
+      // fetch iframe
+      // ================================
+
+      if(iframe){
+
+        playerHtml =
+        await fetchHtml(iframe);
+
+      }
+
+
+
+      // ================================
+      // find m3u8
+      // ================================
+
       const m3u8 =
-      findM3U8(epHtml);
+      findM3U8(playerHtml);
+
+
+
+      console.log(
+        text,
+        m3u8
+      );
 
 
 
@@ -272,6 +375,7 @@ function buildM3U(data){
     m3u +=
 `#EXTINF:-1 tvg-logo="${st.image}" group-title="${data.name}",${st.name}
 #EXTVLCOPT:http-referrer=https://www.123-hds.com/
+#EXTVLCOPT:http-origin=https://www.123-hds.com
 ${st.url}
 
 `;
@@ -307,26 +411,36 @@ async function startFetch(){
 
 
 
-  const data =
-  await parseSeries(url);
+  try{
+
+    const data =
+    await parseSeries(url);
 
 
 
-  document
-  .getElementById("json")
-  .textContent =
-  JSON.stringify(
-    data,
-    null,
-    2
-  );
+    document
+    .getElementById("json")
+    .textContent =
+    JSON.stringify(
+      data,
+      null,
+      2
+    );
 
 
 
-  document
-  .getElementById("m3u")
-  .textContent =
-  buildM3U(data);
+    document
+    .getElementById("m3u")
+    .textContent =
+    buildM3U(data);
+
+  }catch(e){
+
+    console.log(e);
+
+    alert(e.message);
+
+  }
 
 }
 
@@ -334,4 +448,3 @@ async function startFetch(){
 
 </body>
 </html>
-```
