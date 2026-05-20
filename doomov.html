@@ -2,9 +2,9 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <title>ระบบดึงข้อมูลภาพยนตร์เดี่ยว 2026</title>
+    <title>ระบบดึงข้อมูลภาพยนตร์เดี่ยว + JSON Export 2026</title>
     <style>
-        :root { --gold: #ffeb3b; --bg: #0f0f0f; --card: #1e1e1e; --blue: #2196F3; --green: #4CAF50; }
+        :root { --gold: #ffeb3b; --bg: #0f0f0f; --card: #1e1e1e; --blue: #2196F3; --green: #4CAF50; --purple: #9C27B0; }
         body { font-family: 'Tahoma', sans-serif; background: var(--bg); color: #fff; padding: 20px; }
         .container { max-width: 1200px; margin: 0 auto; }
         
@@ -13,6 +13,8 @@
         input { background: #333; border: 1px solid #444; color: #fff; padding: 10px; border-radius: 6px; width: 80px; text-align: center; }
         
         .status-box { background: #1a1a1a; padding: 15px; border-radius: 8px; margin-top: 15px; border-left: 5px solid var(--gold); text-align: center; }
+        .action-group { display: flex; gap: 10px; justify-content: center; margin-top: 10px; }
+        
         .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 25px; margin-top: 20px; }
         
         .card { background: var(--card); border-radius: 15px; overflow: hidden; border: 1px solid #333; transition: 0.3s; display: flex; flex-direction: column; }
@@ -21,7 +23,9 @@
         .card-title { font-size: 15px; font-weight: bold; color: var(--gold); margin-bottom: 8px; min-height: 44px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         
         button.start-btn { background: var(--blue); color: white; padding: 10px 25px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
-        button.view-btn { background: #333; color: white; border: 1px solid #555; padding: 8px; border-radius: 4px; cursor: pointer; width: 100%; margin-top: 10px; font-size: 12px; }
+        button.download-btn { background: var(--purple); color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; display: none; }
+        button.view-btn { background: #333; color: white; border: 1px solid #555; padding: 6px; border-radius: 4px; cursor: pointer; width: 100%; margin-top: 8px; font-size: 12px; }
+        button.json-btn { background: #444; color: #ffeb3b; border: 1px solid #666; padding: 6px; border-radius: 4px; cursor: pointer; width: 100%; margin-top: 5px; font-size: 12px; }
         button.copy-btn { background: var(--green); color: white; border: none; padding: 6px; border-radius: 4px; cursor: pointer; width: 100%; margin-top: 5px; font-size: 11px; font-weight: bold; display: none; }
         
         pre { background: #000; color: #00ff41; padding: 10px; font-size: 11px; overflow-x: auto; max-height: 150px; display: none; border-radius: 5px; text-align: left; white-space: pre-wrap; word-break: break-all; margin-top: 8px; }
@@ -31,7 +35,7 @@
 <body>
 
 <div class="container">
-    <h1 style="text-align:center; color: var(--gold);">สคริปต์ ดึงข้อมูลหนังออนไลน์เดี่ยว ปี 2026</h1>
+    <h1 style="text-align:center; color: var(--gold);">สคริปต์ ดึงข้อมูลหนังออนไลน์เดี่ยว + ระบบออก JSON (Super Bypass)</h1>
     
     <div class="control-panel">
         <div class="input-group">
@@ -45,6 +49,9 @@
         <div class="status-box">
             <div id="loader">📍 พร้อมสำหรับการดึงข้อมูลภาพยนตร์</div>
             <div id="stats" style="color: #888; font-size: 13px; margin-top: 5px;"></div>
+            <div class="action-group">
+                <button id="downloadJsonBtn" class="download-btn" onclick="downloadAllJson()">📥 ดาวน์โหลดไฟล์ JSON ทั้งหมด</button>
+            </div>
         </div>
     </div>
 
@@ -54,6 +61,8 @@
 <script>
 const PROXY = '/api/proxy-k24hd?url=';
 const BASE_CAT = 'https://kubhd24.net/category/%e0%b8%94%e0%b8%b9%e0%b8%ab%e0%b8%99%e0%b8%b1%e0%b8%87%e0%b8%b1%e0%b8%ad%e0%b8%ad%e0%b8%99%e0%b9%84%e0%b8%a5%e0%b8%99%e0%b9%8c-2026/';
+
+let allHarvestedData = [];
 
 async function request(url, isJson = false) {
     try {
@@ -71,6 +80,7 @@ async function getStream(postId) {
     return `https://media.vdohls.com/${match[1].split('/').pop()}/playlist.m3u8`;
 }
 
+// 🛠️ อัปเกรดระบบเจาะหาลิงก์แบบลึกที่สุด (Deep Scan) สำหรับหนังเดี่ยวฉายจริง
 async function parseMovie(id) {
     const html = await request(`https://kubhd24.net/movie/${id}/`);
     if (!html) return null;
@@ -80,31 +90,44 @@ async function parseMovie(id) {
     const imgEl = doc.querySelector("img.wp-post-image") || doc.querySelector(".poster img");
     const poster = imgEl ? (imgEl.getAttribute("data-src") || imgEl.src) : '';
     
-    let postId = null;
+    let streamUrl = '';
 
-    // ค้นหา Post ID จากโครงสร้างต่างๆ ของหน้าหนังเดี่ยว
-    const movieIframe = doc.querySelector(".movie-iframe");
-    if (movieIframe) postId = movieIframe.getAttribute("data-id");
-
-    if (!postId) {
-        const favBtn = doc.querySelector("button.add-favorite") || doc.querySelector("[data-post-id]");
-        if (favBtn) postId = favBtn.getAttribute("data-post-id");
+    // วิธีพิเศษ 1: เจาะหาลิงก์ตรงของ vdohls ที่หลุดมาในหน้าเว็บเพียวๆ (แบบเรื่อง Kartavya)
+    const pageSource = html;
+    const directVdoMatch = pageSource.match(/media\.vdohls\.com\/([^\/"]+)\/playlist\.m3u8/) || pageSource.match(/data-src="([^"]+vdohls\.com[^"]+)"/);
+    if (directVdoMatch) {
+        streamUrl = directVdoMatch[0].startsWith('http') ? directVdoMatch[0] : `https://${directVdoMatch[0]}`;
     }
 
-    if (!postId) {
-        const playerWrapper = doc.querySelector("[id*='player']");
-        if (playerWrapper) postId = playerWrapper.getAttribute("data-post-id") || playerWrapper.id.replace(/\D/g, "");
-    }
-    
-    let episodes = [];
-    if (postId) {
-        const url = await getStream(postId);
-        if (url) {
-            episodes.push({ title: "Full Movie", url });
+    // หากวิธีแรกไม่เจอ ค่อยวิ่งระบบหา Post ID ตามปกติ
+    if (!streamUrl) {
+        let postId = null;
+        
+        const movieIframe = doc.querySelector(".movie-iframe");
+        if (movieIframe) postId = movieIframe.getAttribute("data-id");
+
+        if (!postId) {
+            const favBtn = doc.querySelector("button.add-favorite") || doc.querySelector("[data-post-id]");
+            if (favBtn) postId = favBtn.getAttribute("data-post-id");
+        }
+
+        if (!postId) {
+            const playerWrapper = doc.querySelector("[id*='player']");
+            if (playerWrapper) postId = playerWrapper.getAttribute("data-post-id") || playerWrapper.id.replace(/\D/g, "");
+        }
+
+        if (postId) {
+            const url = await getStream(postId);
+            if (url) streamUrl = url;
         }
     }
+
+    // หากพยายามทุกวิถีทางแล้วยังไม่เจอ ให้ใส่สถานะแจ้งเตือนไว้
+    if (!streamUrl) {
+        streamUrl = 'ไม่พบลิงก์สตรีมหรือถูกบล็อก';
+    }
     
-    return { title, poster, episodes };
+    return { title, poster, streamUrl };
 }
 
 async function startHarvesting() {
@@ -113,8 +136,11 @@ async function startHarvesting() {
     const loader = document.getElementById("loader");
     const output = document.getElementById("output");
     const stats = document.getElementById("stats");
+    const downloadBtn = document.getElementById("downloadJsonBtn");
 
     output.innerHTML = ""; 
+    allHarvestedData = [];
+    downloadBtn.style.display = "none";
     let totalMoviesFound = 0;
 
     for (let p = startPage; p <= endPage; p++) {
@@ -134,20 +160,30 @@ async function startHarvesting() {
             loader.textContent = `⏳ หน้า ${p} | เรื่องที่ ${i+1}/${ids.length}: ${ids[i]}`;
             
             const data = await parseMovie(ids[i]);
-            // บังคับเรนเดอร์การ์ดทันทีที่มีข้อมูล เพื่อไม่ให้หน้าเว็บโล่ง
             if (data) {
-                renderCard(data, p);
+                const jsonStructure = {
+                    "name": data.title,
+                    "image": data.poster,
+                    "url": data.streamUrl,
+                    "referer": "",
+                    "info": "HD | พากย์ไทย | Server StreamX ",
+                    "playInNatPlayer": "true"
+                };
+                
+                allHarvestedData.push(jsonStructure);
+                renderCard(data, jsonStructure, p);
             }
         }
     }
     loader.textContent = `✅ ดึงข้อมูลหนังสำเร็จ! รวมทั้งหมด ${totalMoviesFound} เรื่อง จากหน้า ${startPage}-${endPage}`;
+    if(allHarvestedData.length > 0) {
+        downloadBtn.style.display = "inline-block";
+    }
 }
 
-function renderCard(data, pageNum) {
-    let streamUrl = (data.episodes && data.episodes[0]) ? data.episodes[0].url : 'ไม่พบลิงก์สตรีมหรือถูกบล็อก';
-    
+function renderCard(data, jsonStructure, pageNum) {
     let m3u = "#EXTM3U\n";
-    m3u += `#EXTINF:-1 tvg-logo="${data.poster}" group-title="หนังภาพยนตร์เดี่ยว", ${data.title}\n${streamUrl}\n`;
+    m3u += `#EXTINF:-1 tvg-logo="${data.poster}" group-title="หนังภาพยนตร์เดี่ยว", ${data.title}\n${data.streamUrl}\n`;
 
     const card = document.createElement("div");
     card.className = "card";
@@ -159,35 +195,50 @@ function renderCard(data, pageNum) {
                 <div class="card-title">${data.title}</div>
             </div>
             <div>
-                <button class="view-btn" onclick="toggleM3U(this)">📂 แสดง M3U Playlist</button>
-                <button class="copy-btn" onclick="copyToClipboard(this)">📋 คัดลอกลิงก์สตรีม</button>
-                <pre>${m3u}</pre>
+                <button class="view-btn" onclick="toggleBlock(this, '.m3u-box')">📂 แสดง M3U Playlist</button>
+                <button class="json-btn" onclick="toggleBlock(this, '.json-box')">⚙️ แสดงโครงสร้าง JSON</button>
+                <button class="copy-btn" onclick="copyText(this)">📋 คัดลอกข้อมูล</button>
+                
+                <pre class="m3u-box">${m3u}</pre>
+                <pre class="json-box">${JSON.stringify(jsonStructure, null, 2)}</pre>
             </div>
         </div>
     `;
     document.getElementById("output").appendChild(card);
 }
 
-function toggleM3U(btn) {
-    const pre = btn.parentElement.querySelector("pre");
-    const copyBtn = btn.parentElement.querySelector(".copy-btn");
-    if (pre.style.display === 'block') {
-        pre.style.display = 'none';
+function toggleBlock(btn, targetClass) {
+    const parent = btn.parentElement;
+    const targetBlock = parent.querySelector(targetClass);
+    const copyBtn = parent.querySelector(".copy-btn");
+    const allPre = parent.querySelectorAll("pre");
+    
+    allPre.forEach(pre => {
+        if(pre !== targetBlock) pre.style.display = 'none';
+    });
+
+    if (targetBlock.style.display === 'block') {
+        targetBlock.style.display = 'none';
         copyBtn.style.display = 'none';
-        btn.textContent = '📂 แสดง M3U Playlist';
     } else {
-        pre.style.display = 'block';
+        targetBlock.style.display = 'block';
         copyBtn.style.display = 'block';
-        btn.textContent = '✖ ปิดหน้าต่าง';
     }
 }
 
-function copyToClipboard(btn) {
-    const pre = btn.parentElement.querySelector("pre");
-    const lines = pre.textContent.split('\n');
-    const streamUrl = lines[lines.length - 2] || lines[1]; 
+function copyText(btn) {
+    const parent = btn.parentElement;
+    let textToCopy = "";
     
-    navigator.clipboard.writeText(streamUrl.trim()).then(() => {
+    const m3uBox = parent.querySelector(".m3u-box");
+    const jsonBox = parent.querySelector(".json-box");
+    
+    if (m3uBox.style.display === 'block') textToCopy = m3uBox.textContent;
+    if (jsonBox.style.display === 'block') textToCopy = jsonBox.textContent;
+    
+    if(!textToCopy) return;
+
+    navigator.clipboard.writeText(textToCopy.trim()).then(() => {
         const oldText = btn.textContent;
         btn.textContent = '✅ คัดลอกสำเร็จ!';
         btn.style.background = '#009688';
@@ -196,6 +247,19 @@ function copyToClipboard(btn) {
             btn.style.background = 'var(--green)';
         }, 1500);
     });
+}
+
+function downloadAllJson() {
+    if(allHarvestedData.length === 0) return;
+    const blob = new Blob([JSON.stringify(allHarvestedData, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `movies_list_${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 }
 </script>
 </body>
