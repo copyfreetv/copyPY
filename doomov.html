@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <title>ระบบดึงข้อมูลภาพยนตร์เดี่ยว + JSON Export 2026</title>
+    <title>ระบบดึงข้อมูลภาพยนตร์เดี่ยว + JSON Export (Fix Playlist.m3u8)</title>
     <style>
         :root { --gold: #ffeb3b; --bg: #0f0f0f; --card: #1e1e1e; --blue: #2196F3; --green: #4CAF50; --purple: #9C27B0; }
         body { font-family: 'Tahoma', sans-serif; background: var(--bg); color: #fff; padding: 20px; }
@@ -35,7 +35,7 @@
 <body>
 
 <div class="container">
-    <h1 style="text-align:center; color: var(--gold);">สคริปต์ ดึงข้อมูลหนังออนไลน์เดี่ยว + ระบบออก JSON (Super Bypass)</h1>
+    <h1 style="text-align:center; color: var(--gold);">สคริปต์ ดึงข้อมูลหนังออนไลน์เดี่ยว + ระบบออก JSON (Auto Double-Check)</h1>
     
     <div class="control-panel">
         <div class="input-group">
@@ -72,18 +72,38 @@ async function request(url, isJson = false) {
     } catch (e) { return null; }
 }
 
+// 🛠️ ปรับปรุงระบบเรียกตัวเล่นให้พยายาม "เบิ้ลสตรีมดึงซ้ำเพื่อบังคับให้แคชตื่นขึ้นมาทำงาน"
 async function getStream(postId) {
+    // ส่งรอบแรกเพื่อปลุกสตรีมเครื่องเล่นของเพจ
+    await request(`https://kubhd24.net/wp-admin/admin-ajax.php?action=mix_get_player&post_id=${postId}`, true);
+    
+    // ดีเลย์นิดหน่อยก่อนดึงซ้ำรอบสอง (เสมือนการรีเฟรชรอบ 2 หลังบ้าน)
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
     const json = await request(`https://kubhd24.net/wp-admin/admin-ajax.php?action=mix_get_player&post_id=${postId}`, true);
     if (!json?.success) return null;
-    const match = json.player.match(/data-src="([^"]+)"/);
+    
+    // ดักจับทั้งลิงก์เต็ม และลิงก์ย่อที่มีเฉพาะก้อนตัวแปรสตรีมมิ่ง
+    const match = json.player.match(/data-src="([^"]+)"/) || json.player.match(/src="([^"]+)"/);
     if (!match) return null;
-    return `https://media.vdohls.com/${match[1].split('/').pop()}/playlist.m3u8`;
+    
+    const rawUrl = match[1];
+    if (rawUrl.includes('playlist.m3u8')) {
+        return rawUrl.startsWith('http') ? rawUrl : `https:${rawUrl}`;
+    }
+    
+    return `https://media.vdohls.com/${rawUrl.split('/').pop()}/playlist.m3u8`;
 }
 
-// 🛠️ อัปเกรดระบบเจาะหาลิงก์แบบลึกที่สุด (Deep Scan) สำหรับหนังเดี่ยวฉายจริง
 async function parseMovie(id) {
-    const html = await request(`https://kubhd24.net/movie/${id}/`);
+    // 🛠️ สั่งดึงข้อมูลซอร์สโค้ดหน้าเว็บครั้งแรกเพื่อกระตุ้นระบบต้นทาง
+    let html = await request(`https://kubhd24.net/movie/${id}/`);
     if (!html) return null;
+    
+    // ทำการรีเฟรชส่งคำขอรอบที่ 2 ทันทีอัตโนมัติ แก้ปัญหาดีเลย์ของบอทเครื่องเล่น
+    await new Promise(resolve => setTimeout(resolve, 200));
+    html = await request(`https://kubhd24.net/movie/${id}/`);
+    
     const doc = new DOMParser().parseFromString(html, "text/html");
     const title = doc.querySelector("h1")?.textContent.trim() || id;
     
@@ -92,14 +112,19 @@ async function parseMovie(id) {
     
     let streamUrl = '';
 
-    // วิธีพิเศษ 1: เจาะหาลิงก์ตรงของ vdohls ที่หลุดมาในหน้าเว็บเพียวๆ (แบบเรื่อง Kartavya)
-    const pageSource = html;
-    const directVdoMatch = pageSource.match(/media\.vdohls\.com\/([^\/"]+)\/playlist\.m3u8/) || pageSource.match(/data-src="([^"]+vdohls\.com[^"]+)"/);
+    // วิธีที่ 1: ตรวจสอบ Regex หาแพทเทิร์นตรงของ vdohls/playlist.m3u8 ในสคริปต์หน้าเพจ
+    const directVdoMatch = html.match(/media\.vdohls\.com\/([^\/"]+)\/playlist\.m3u8/) || html.match(/[\/"]([\w_\-]+)\/playlist\.m3u8/);
     if (directVdoMatch) {
-        streamUrl = directVdoMatch[0].startsWith('http') ? directVdoMatch[0] : `https://${directVdoMatch[0]}`;
+        if (directVdoMatch[0].includes('media.vdohls.com')) {
+            streamUrl = directVdoMatch[0].startsWith('http') ? directVdoMatch[0] : `https://${directVdoMatch[0]}`;
+        } else {
+            // กรณีเจอแค่ก้อนไอดีสตรีมมิ่ง คืนค่าจัดให้อยู่ในฟอร์แมต playlist.m3u8 ที่พี่แกะเจอใน DevTools 
+            const cleanId = directVdoMatch[1];
+            streamUrl = `https://media.vdohls.com/${cleanId}/playlist.m3u8`;
+        }
     }
 
-    // หากวิธีแรกไม่เจอ ค่อยวิ่งระบบหา Post ID ตามปกติ
+    // วิธีที่ 2: ดึงจากไอดีตัวเล่นระบบหลังบ้านหากวิธีแรกยังไม่ได้สตรีมตรงๆ
     if (!streamUrl) {
         let postId = null;
         
@@ -122,7 +147,6 @@ async function parseMovie(id) {
         }
     }
 
-    // หากพยายามทุกวิถีทางแล้วยังไม่เจอ ให้ใส่สถานะแจ้งเตือนไว้
     if (!streamUrl) {
         streamUrl = 'ไม่พบลิงก์สตรีมหรือถูกบล็อก';
     }
