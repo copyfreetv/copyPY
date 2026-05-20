@@ -2,7 +2,8 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport"
+content="width=device-width, initial-scale=1.0">
 
 <title>Doo-Nang Movie Explorer</title>
 
@@ -36,7 +37,8 @@ body{
 
 .grid{
     display:grid;
-    grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
+    grid-template-columns:
+    repeat(auto-fill,minmax(280px,1fr));
     gap:20px;
 }
 
@@ -130,88 +132,207 @@ select,input{
 
 <select id="category">
 
-<option value="movie">ภาพยนตร์</option>
-<option value="thai-movie">ภาพยนตร์ ไทย</option>
-<option value="korean-movie">ภาพยนตร์ เกาหลี</option>
-<option value="japanese-movie">ภาพยนตร์ ญี่ปุ่น</option>
-<option value="indian-movie">ภาพยนตร์ อินเดีย</option>
-<option value="cartoon-movie">ภาพยนตร์ การ์ตูน</option>
-<option value="historical-movie">หนังประวัติศาสตร์</option>
+<option value="movie">
+ภาพยนตร์
+</option>
+
+<option value="thai-movie">
+ภาพยนตร์ ไทย
+</option>
+
+<option value="korean-movie">
+ภาพยนตร์ เกาหลี
+</option>
+
+<option value="japanese-movie">
+ภาพยนตร์ ญี่ปุ่น
+</option>
+
+<option value="indian-movie">
+ภาพยนตร์ อินเดีย
+</option>
+
+<option value="cartoon-movie">
+ภาพยนตร์ การ์ตูน
+</option>
+
+<option value="historical-movie">
+หนังประวัติศาสตร์
+</option>
 
 </select>
 
-<input type="number" id="startPage" value="1" min="1">
+<input
+type="number"
+id="startPage"
+value="1"
+min="1">
 
-<input type="number" id="endPage" value="1" min="1">
+<input
+type="number"
+id="endPage"
+value="1"
+min="1">
 
-<button class="fetch-btn" onclick="startHarvest()">
+<button
+class="fetch-btn"
+onclick="startHarvest()">
+
 🚀 เริ่มดึงข้อมูล
+
 </button>
 
-<div class="status" id="status">
+<div
+class="status"
+id="status">
+
 พร้อมทำงาน
-</div>
 
 </div>
 
-<div id="output" class="grid"></div>
+</div>
+
+<div
+id="output"
+class="grid">
+</div>
 
 </div>
 
 <script>
 
+// ===================================
+// CONFIG
+// ===================================
+
 const GRAPHQL =
 "https://api.doo-nang.com/graphql";
 
+const PROXY =
+"https://corsproxy.io/?";
 
-// ==========================
-// category map
-// ==========================
+
+// ===================================
+// CATEGORY
+// ===================================
 
 const categoryMap = {
 
-    movie:
-    "https://www.doo-nang.com/%E0%B8%94%E0%B8%B9%E0%B8%AB%E0%B8%99%E0%B8%B1%E0%B8%87%E0%B8%AD%E0%B8%AD%E0%B8%99%E0%B9%84%E0%B8%A5%E0%B8%99%E0%B9%8C/list?type=content&value=movies&title=%E0%B8%A0%E0%B8%B2%E0%B8%9E%E0%B8%A2%E0%B8%99%E0%B8%95%E0%B8%A3%E0%B9%8C",
+movie:
+"https://www.doo-nang.com/ดูหนังออนไลน์/list?type=content&value=movies&title=ภาพยนตร์",
 
-    "thai-movie":
-    "https://www.doo-nang.com/ดูหนังออนไลน์/list?type=movie-tag&value=ไทย&title=ภาพยนตร์ ไทย",
+"thai-movie":
+"https://www.doo-nang.com/ดูหนังออนไลน์/list?type=movie-tag&value=ไทย&title=ภาพยนตร์ ไทย",
 
-    "korean-movie":
-    "https://www.doo-nang.com/ดูหนังออนไลน์/list?type=movie-tag&value=เกาหลี",
+"korean-movie":
+"https://www.doo-nang.com/ดูหนังออนไลน์/list?type=movie-tag&value=เกาหลี",
 
-    "japanese-movie":
-    "https://www.doo-nang.com/ดูหนังออนไลน์/list?type=movie-tag&value=ญี่ปุ่น",
+"japanese-movie":
+"https://www.doo-nang.com/ดูหนังออนไลน์/list?type=movie-tag&value=ญี่ปุ่น",
 
-    "indian-movie":
-    "https://www.doo-nang.com/ดูหนังออนไลน์/list?type=movie-tag&value=อินเดีย",
+"indian-movie":
+"https://www.doo-nang.com/ดูหนังออนไลน์/list?type=movie-tag&value=อินเดีย",
 
-    "cartoon-movie":
-    "https://www.doo-nang.com/ดูหนังออนไลน์/list?type=movie-tag&value=การ์ตูน",
+"cartoon-movie":
+"https://www.doo-nang.com/ดูหนังออนไลน์/list?type=movie-tag&value=การ์ตูน",
 
-    "historical-movie":
-    "https://www.doo-nang.com/ดูหนังออนไลน์/list?type=movie-tag&value=ประวัติศาสตร์"
+"historical-movie":
+"https://www.doo-nang.com/ดูหนังออนไลน์/list?type=movie-tag&value=ประวัติศาสตร์"
+
 };
 
 
-
-// ==========================
-// request html
-// ==========================
+// ===================================
+// REQUEST
+// ===================================
 
 async function request(url){
 
-    const res = await fetch(url);
+    try{
 
-    return await res.text();
+        const res =
+        await fetch(
+            PROXY +
+            encodeURIComponent(url)
+        );
+
+        return await res.text();
+
+    }catch(e){
+
+        console.log(e);
+
+        return "";
+
+    }
+
 }
 
 
+// ===================================
+// PARSE PAGE
+// ===================================
 
-// ==========================
-// fetch movie
-// ==========================
+async function parsePage(url){
 
-async function fetchMovie(id){
+    const html =
+    await request(url);
+
+    const doc =
+    new DOMParser()
+    .parseFromString(
+        html,
+        "text/html"
+    );
+
+    const links =
+    [
+        ...doc.querySelectorAll("a")
+    ];
+
+    const movieLinks =
+    links
+    .map(a => a.href)
+    .filter(href =>
+
+        href.includes("/ดูหนัง/")
+
+        &&
+
+        !href.includes("list?")
+
+    );
+
+    return [...new Set(movieLinks)];
+
+}
+
+
+// ===================================
+// FETCH MOVIE
+// ===================================
+
+async function fetchMovie(url){
+
+try{
+
+const html =
+await request(url);
+
+const match =
+html.match(
+/"id":(\d+),"titleTh"/
+);
+
+if(!match){
+
+console.log("NOT FOUND ID");
+
+return null;
+
+}
+
+const id = match[1];
 
 const query = `
 
@@ -235,9 +356,8 @@ cdnHostname
 }
 `;
 
-try{
-
-const res = await fetch(GRAPHQL,{
+const res =
+await fetch(GRAPHQL,{
 
 method:"POST",
 
@@ -246,26 +366,46 @@ headers:{
 },
 
 body:JSON.stringify({
+
 query,
-variables:{id}
+
+variables:{
+id
+}
+
 })
 
 });
 
-const json = await res.json();
+const json =
+await res.json();
 
-const movie = json?.data?.movie;
+const movie =
+json?.data?.movie;
 
-if(!movie) return null;
+if(!movie){
 
-const uuid = movie.video?.transcodeUuid;
-const host = movie.video?.cdnHostname;
+console.log("MOVIE NULL");
 
-if(!uuid || !host) return null;
+return null;
+
+}
+
+const uuid =
+movie.video?.transcodeUuid;
+
+if(!uuid){
+
+console.log("NO VIDEO");
+
+return null;
+
+}
 
 return {
 
-id:movie.id,
+id:
+movie.id,
 
 title:
 movie.titleTh ||
@@ -278,14 +418,17 @@ poster:
 movie.posterUrl,
 
 year:
-movie.releaseDate?.substring(0,4),
+movie.releaseDate?.substring(0,4)
+|| "0000",
 
 video:
 `https://api.doo-nang.com/video/${uuid}/playlist.m3u8`
 
 };
 
-}catch{
+}catch(e){
+
+console.log(e);
 
 return null;
 
@@ -294,57 +437,48 @@ return null;
 }
 
 
-
-// ==========================
-// parse page
-// ==========================
-
-async function parsePage(url){
-
-const html = await request(url);
-
-const ids =
-[
-...html.matchAll(/movie\/(\d+)/g)
-]
-.map(x=>x[1]);
-
-return [...new Set(ids)];
-
-}
-
-
-
-// ==========================
-// start
-// ==========================
+// ===================================
+// START
+// ===================================
 
 async function startHarvest(){
 
 const category =
-document.getElementById("category").value;
+document
+.getElementById("category")
+.value;
 
 const startPage =
 parseInt(
-document.getElementById("startPage").value
+document
+.getElementById("startPage")
+.value
 );
 
 const endPage =
 parseInt(
-document.getElementById("endPage").value
+document
+.getElementById("endPage")
+.value
 );
 
 const output =
-document.getElementById("output");
+document
+.getElementById("output");
 
 const status =
-document.getElementById("status");
+document
+.getElementById("status");
 
 output.innerHTML = "";
 
 let total = 0;
 
-for(let p=startPage;p<=endPage;p++){
+for(
+let p = startPage;
+p <= endPage;
+p++
+){
 
 status.innerHTML =
 `🔍 กำลังสแกนหน้า ${p}`;
@@ -353,19 +487,32 @@ let pageUrl =
 categoryMap[category];
 
 if(p > 1){
-pageUrl += `page/${p}/`;
+
+pageUrl += `&page=${p}`;
+
 }
 
-const ids =
+const urls =
 await parsePage(pageUrl);
 
-for(let i=0;i<ids.length;i++){
+console.log(urls);
+
+for(
+let i=0;
+i<urls.length;
+i++
+){
 
 status.innerHTML =
-`🎬 หน้า ${p} | เรื่อง ${i+1}/${ids.length}`;
+
+`🎬 หน้า ${p}
+|
+เรื่อง ${i+1}/${urls.length}`;
 
 const movie =
-await fetchMovie(ids[i]);
+await fetchMovie(
+urls[i]
+);
 
 if(movie){
 
@@ -375,7 +522,9 @@ total++;
 
 }
 
-await new Promise(r=>setTimeout(r,100));
+await new Promise(
+r=>setTimeout(r,100)
+);
 
 }
 
@@ -387,10 +536,9 @@ status.innerHTML =
 }
 
 
-
-// ==========================
-// render
-// ==========================
+// ===================================
+// RENDER
+// ===================================
 
 function renderMovie(movie,page){
 
@@ -398,20 +546,32 @@ const m3u =
 
 `#EXTM3U
 
-#EXTINF:-1 tvg-logo="${movie.poster}" group-title="Movies", ${movie.title}
+#EXTINF:-1
+tvg-logo="${movie.poster}"
+group-title="Movies",
+
+${movie.title}
+
 ${movie.video}`;
 
 const json =
-JSON.stringify(movie,null,2);
+JSON.stringify(
+movie,
+null,
+2
+);
 
 const card =
 document.createElement("div");
 
-card.className = "card";
+card.className =
+"card";
 
 card.innerHTML = `
 
-<img class="poster" src="${movie.poster}">
+<img
+class="poster"
+src="${movie.poster}">
 
 <div class="card-body">
 
@@ -427,21 +587,28 @@ ${movie.title}
 ${movie.year}
 </div>
 
-<button class="view-btn"
+<button
+class="view-btn"
 onclick="toggleBox(this)">
+
 📂 แสดง M3U Playlist
+
 </button>
 
 <pre>${m3u}</pre>
 
-<button class="view-btn"
+<button
+class="view-btn"
 onclick="toggleBox(this)">
+
 📦 แสดง JSON
+
 </button>
 
 <pre>${json}</pre>
 
 </div>
+
 `;
 
 document
@@ -451,10 +618,9 @@ document
 }
 
 
-
-// ==========================
-// toggle
-// ==========================
+// ===================================
+// TOGGLE
+// ===================================
 
 function toggleBox(btn){
 
@@ -462,22 +628,35 @@ const pre =
 btn.nextElementSibling;
 
 const isOpen =
-pre.style.display === "block";
+pre.style.display ===
+"block";
 
 pre.style.display =
-isOpen ? "none" : "block";
+isOpen
+?
+"none"
+:
+"block";
+
+if(btn.textContent.includes("JSON")){
 
 btn.textContent =
 isOpen
 ?
-btn.textContent.includes("JSON")
-? "📦 แสดง JSON"
-: "📂 แสดง M3U Playlist"
-
+"📦 แสดง JSON"
 :
-btn.textContent.includes("JSON")
-? "✖ ปิด JSON"
-: "✖ ปิด Playlist";
+"✖ ปิด JSON";
+
+}else{
+
+btn.textContent =
+isOpen
+?
+"📂 แสดง M3U Playlist"
+:
+"✖ ปิด Playlist";
+
+}
 
 }
 
