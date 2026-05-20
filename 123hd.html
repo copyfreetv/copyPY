@@ -62,7 +62,7 @@ pre{
   border-radius:10px;
   overflow:auto;
   margin-top:20px;
-  max-height:600px;
+  max-height:700px;
   white-space:pre-wrap;
 }
 
@@ -156,7 +156,9 @@ async function fetchHtml(url){
 
 function findM3U8(html){
 
-  // main.24playerhd.com/newplaylist/
+  // ====================================
+  // DIRECT
+  // ====================================
 
   let match =
   html.match(
@@ -171,7 +173,26 @@ function findM3U8(html){
 
 
 
-  // escaped
+  // ====================================
+  // INDEX_TH
+  // ====================================
+
+  match =
+  html.match(
+/https?:\/\/main\.24playerhd\.com\/index_th\.php\?id=[^"' ]+/gi
+  );
+
+  if(match && match.length){
+
+    return match[0];
+
+  }
+
+
+
+  // ====================================
+  // ESCAPED
+  // ====================================
 
   match =
   html.match(
@@ -219,32 +240,48 @@ async function parseSeries(url){
   // TITLE
   // ====================================
 
-  const title =
-  doc.querySelector("h1")?.innerText ||
+  let title =
+  doc.querySelector(".entry-title")?.innerText
+  ||
+  doc.querySelector("h1")?.innerText
+  ||
+  document.title
+  ||
   "Unknown";
 
 
 
+  title =
+  title
+  .replace("ดูซีรี่ย์ออนไลน์","")
+  .replace("- 123-HD.COM","")
+  .trim();
+
+
+
+
   // ====================================
-  // POSTER
+  // IMAGE
   // ====================================
 
   let image = "";
 
-  const img =
-  doc.querySelector("img");
+  const poster =
+  doc.querySelector(
+    'meta[property="og:image"]'
+  );
 
-  if(img){
+  if(poster){
 
     image =
-    img.src;
+    poster.content;
 
   }
 
 
 
   // ====================================
-  // FIND EPISODE LINKS
+  // LINKS
   // ====================================
 
   const links =
@@ -257,7 +294,7 @@ async function parseSeries(url){
 
 
   // ====================================
-  // LOOP EPISODES
+  // LOOP
   // ====================================
 
   for(const a of links){
@@ -270,9 +307,9 @@ async function parseSeries(url){
 
 
 
-    // ================================
+    // =================================
     // FILTER
-    // ================================
+    // =================================
 
     if(!href) continue;
 
@@ -296,7 +333,7 @@ async function parseSeries(url){
 
 
       // ================================
-      // FETCH EPISODE PAGE
+      // EPISODE PAGE
       // ================================
 
       const epHtml =
@@ -315,7 +352,13 @@ async function parseSeries(url){
       // ================================
 
       const iframe =
-      epDoc.querySelector("iframe");
+      epDoc.querySelector("iframe")
+      ||
+      epDoc.querySelector(
+        ".embed-responsive iframe"
+      );
+
+
 
       if(!iframe){
 
@@ -339,13 +382,26 @@ async function parseSeries(url){
 
 
 
+      console.log(
+        "iframe:",
+        iframeUrl
+      );
+
+
+
       // ================================
-      // FETCH PLAYER HTML
+      // FETCH PLAYER
       // ================================
 
       const playerHtml =
       await fetchHtml(
         iframeUrl
+      );
+
+
+
+      console.log(
+        playerHtml
       );
 
 
@@ -362,7 +418,7 @@ async function parseSeries(url){
 
 
       console.log(
-        text,
+        "m3u8:",
         m3u8
       );
 
@@ -404,7 +460,7 @@ async function parseSeries(url){
 
 
   // ====================================
-  // RETURN JSON
+  // RETURN
   // ====================================
 
   return {
