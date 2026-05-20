@@ -1,4 +1,4 @@
-```html id="8g7s4a"
+```html
 <!DOCTYPE html>
 <html lang="th">
 <head>
@@ -18,7 +18,7 @@ body{
 }
 
 .container{
-    max-width:1200px;
+    max-width:1400px;
     margin:auto;
 }
 
@@ -59,6 +59,12 @@ body{
     margin-bottom:10px;
 }
 
+.meta{
+    color:#aaa;
+    font-size:12px;
+    margin-bottom:8px;
+}
+
 button{
     padding:10px;
     width:100%;
@@ -88,6 +94,7 @@ pre{
     max-height:250px;
     font-size:11px;
     margin-top:10px;
+    white-space:pre-wrap;
 }
 
 select,input{
@@ -188,9 +195,9 @@ let allMovies = [];
 
 
 
-// =============================
-// fetch movie
-// =============================
+// =====================================
+// FETCH MOVIE
+// =====================================
 
 async function fetchMovie(id){
 
@@ -255,17 +262,44 @@ movie.video?.transcodeUuid;
 if(!uuid)
 return null;
 
+const title =
+movie.titleTh ||
+movie.titleEn;
+
+let info = "";
+
+// =====================================
+// detect soundtrack
+// =====================================
+
+const lowerTitle =
+title.toLowerCase();
+
+if(
+lowerTitle.includes("soundtrack")
+||
+lowerTitle.includes("ซับไทย")
+){
+
+info =
+"Soundtrack/ซับไทย";
+
+}else{
+
+info =
+"พากย์ไทย";
+
+}
+
 return {
 
 id:
 movie.id,
 
 nation:
-movie.nation,
+movie.nation || "movie",
 
-title:
-movie.titleTh ||
-movie.titleEn,
+title,
 
 plot:
 movie.synopsisTh || "-",
@@ -274,11 +308,15 @@ poster:
 movie.posterUrl,
 
 year:
+parseInt(
 movie.releaseDate?.substring(0,4)
-|| "0000",
+|| "0"
+),
 
 video:
-`https://api.doo-nang.com/video/${uuid}/playlist.m3u8`
+`https://api.doo-nang.com/video/${uuid}/playlist.m3u8`,
+
+info
 
 };
 
@@ -292,29 +330,55 @@ return null;
 
 
 
-// =============================
-// generate m3u
-// =============================
+// =====================================
+// GENERATE M3U
+// =====================================
 
 function generateM3U(movie){
 
 return `#EXTM3U
-
-#EXTINF:-1
-tvg-logo="${movie.poster}"
-group-title="${movie.nation}",
-
-${movie.title}
-
+#EXTINF:-1 tvg-id="" tvg-logo="${movie.poster}" group-title="${movie.nation.toLowerCase()}",${movie.title}
 ${movie.video}`;
 
 }
 
 
 
-// =============================
-// render card
-// =============================
+// =====================================
+// GENERATE JSON
+// =====================================
+
+function generateJSON(movie){
+
+return JSON.stringify({
+
+name:
+movie.title,
+
+image:
+movie.poster,
+
+url:
+movie.video,
+
+referer:
+"https://www.doo-nang.com/",
+
+userAgent:
+"Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+
+info:
+movie.info
+
+},null,2);
+
+}
+
+
+
+// =====================================
+// RENDER CARD
+// =====================================
 
 function renderMovie(movie){
 
@@ -336,10 +400,14 @@ src="${movie.poster}">
 ${movie.title}
 </div>
 
-<div style="color:#aaa;font-size:12px;">
+<div class="meta">
 ${movie.year}
 |
 ${movie.nation}
+</div>
+
+<div class="meta">
+${movie.info}
 </div>
 
 <button
@@ -363,7 +431,7 @@ onclick="toggleBox(this)">
 </button>
 
 <pre>
-${JSON.stringify(movie,null,2)}
+${generateJSON(movie)}
 </pre>
 
 </div>
@@ -377,9 +445,9 @@ document
 
 
 
-// =============================
-// toggle
-// =============================
+// =====================================
+// TOGGLE
+// =====================================
 
 function toggleBox(btn){
 
@@ -401,9 +469,9 @@ isOpen
 
 
 
-// =============================
-// start scraping
-// =============================
+// =====================================
+// START SCRAPING
+// =====================================
 
 async function startScraping(){
 
@@ -459,9 +527,9 @@ continue;
 }
 
 
-// ======================
+// =====================================
 // FILTER CATEGORY
-// ======================
+// =====================================
 
 if(
 category !== "ALL"
@@ -485,57 +553,171 @@ r=>setTimeout(r,120)
 
 }
 
+
+// =====================================
+// SORT YEAR
+// =====================================
+
+allMovies.sort(
+(a,b)=>
+b.year - a.year
+);
+
+
+// =====================================
+// RE-RENDER SORTED
+// =====================================
+
+output.innerHTML = "";
+
+allMovies.forEach(movie=>{
+
+renderMovie(movie);
+
+});
+
+
+
 status.innerHTML =
 `✅ พบ ${total} เรื่อง`;
 
-downloadM3U();
+downloadFiles();
 
 }
 
 
 
-// =============================
-// download
-// =============================
+// =====================================
+// DOWNLOAD FILES
+// =====================================
 
-function downloadM3U(){
+function downloadFiles(){
+
+// =====================================
+// SORT YEAR
+// =====================================
+
+allMovies.sort(
+(a,b)=>
+b.year - a.year
+);
+
+
+// =====================================
+// M3U
+// =====================================
 
 let m3u =
 "#EXTM3U\n";
 
+
+// =====================================
+// JSON
+// =====================================
+
+let jsonOutput = [];
+
+
+
 allMovies.forEach(movie=>{
 
+// =====================================
+// M3U
+// =====================================
+
 m3u +=
-
-`#EXTINF:-1
-tvg-logo="${movie.poster}"
-group-title="${movie.nation}",
-
-${movie.title}
-
+`#EXTINF:-1 tvg-id="" tvg-logo="${movie.poster}" group-title="${movie.nation.toLowerCase()}",${movie.title}
 ${movie.video}
-
 `;
+
+
+
+// =====================================
+// JSON
+// =====================================
+
+jsonOutput.push({
+
+name:
+movie.title,
+
+image:
+movie.poster,
+
+url:
+movie.video,
+
+referer:
+"https://www.doo-nang.com/",
+
+userAgent:
+"Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+
+info:
+movie.info
 
 });
 
-const blob =
+});
+
+
+
+// =====================================
+// DOWNLOAD M3U
+// =====================================
+
+const blobM3U =
 new Blob([m3u],{
 type:"text/plain"
 });
 
-const url =
-URL.createObjectURL(blob);
+const urlM3U =
+URL.createObjectURL(blobM3U);
 
-const a =
+const a1 =
 document.createElement("a");
 
-a.href = url;
+a1.href =
+urlM3U;
 
-a.download =
-"doo-nang-category.m3u";
+a1.download =
+"doo-nang.m3u";
 
-a.click();
+a1.click();
+
+
+
+// =====================================
+// DOWNLOAD JSON
+// =====================================
+
+const blobJSON =
+new Blob(
+[
+JSON.stringify(
+jsonOutput,
+null,
+2
+)
+],
+{
+type:"application/json"
+}
+);
+
+const urlJSON =
+URL.createObjectURL(blobJSON);
+
+const a2 =
+document.createElement("a");
+
+a2.href =
+urlJSON;
+
+a2.download =
+"doo-nang.json";
+
+a2.click();
 
 }
 
