@@ -5,45 +5,117 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>Doo-Nang Movie Scraper</title>
+<title>Doo-Nang Movie Explorer</title>
 
 <style>
+
+:root{
+    --bg:#0f0f0f;
+    --card:#1d1d1d;
+    --gold:#ffeb3b;
+    --blue:#2196f3;
+}
+
 body{
-    background:#111;
+    background:var(--bg);
     color:#fff;
-    font-family:Arial;
+    font-family:tahoma;
     padding:20px;
 }
 
 .container{
-    max-width:1000px;
+    max-width:1400px;
     margin:auto;
 }
 
-button{
-    padding:12px 20px;
-    border:none;
-    background:#5FBE00;
-    color:#000;
+.control{
+    background:#1b1b1b;
+    padding:20px;
+    border-radius:12px;
+    margin-bottom:25px;
+}
+
+.grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
+    gap:20px;
+}
+
+.card{
+    background:var(--card);
+    border-radius:14px;
+    overflow:hidden;
+    border:1px solid #333;
+}
+
+.poster{
+    width:100%;
+    height:380px;
+    object-fit:cover;
+}
+
+.card-body{
+    padding:15px;
+}
+
+.title{
+    color:var(--gold);
+    font-size:16px;
     font-weight:bold;
+    margin-bottom:8px;
+}
+
+.meta{
+    color:#aaa;
+    font-size:12px;
+    margin-bottom:10px;
+}
+
+button{
+    border:none;
+    padding:10px;
+    width:100%;
+    margin-top:8px;
+    border-radius:6px;
     cursor:pointer;
-    border-radius:8px;
+    font-weight:bold;
+}
+
+.fetch-btn{
+    background:var(--blue);
+    color:#fff;
+}
+
+.view-btn{
+    background:#444;
+    color:#fff;
 }
 
 pre{
+    display:none;
     background:#000;
-    color:#5FBE00;
-    padding:15px;
+    color:#00ff41;
+    padding:10px;
+    border-radius:6px;
     overflow:auto;
-    max-height:500px;
-    border-radius:10px;
-    margin-top:20px;
+    max-height:250px;
+    font-size:11px;
+    margin-top:10px;
 }
 
-#status{
-    margin-top:20px;
-    color:#5FBE00;
+select,input{
+    padding:10px;
+    border-radius:6px;
+    border:none;
+    background:#333;
+    color:#fff;
 }
+
+.status{
+    margin-top:15px;
+    color:#ffeb3b;
+}
+
 </style>
 </head>
 
@@ -51,331 +123,364 @@ pre{
 
 <div class="container">
 
-<h1>Doo-Nang Full Movie Scraper</h1>
+<h1 style="text-align:center;color:var(--gold)">
+🎬 Doo-Nang Movie Explorer
+</h1>
 
-<button id="startBtn">
-เริ่มดึงหนังทั้งหมด
+<div class="control">
+
+<select id="category">
+
+<option value="movie">ภาพยนตร์</option>
+<option value="thai-movie">ภาพยนตร์ ไทย</option>
+<option value="korean-movie">ภาพยนตร์ เกาหลี</option>
+<option value="japanese-movie">ภาพยนตร์ ญี่ปุ่น</option>
+<option value="indian-movie">ภาพยนตร์ อินเดีย</option>
+<option value="cartoon-movie">ภาพยนตร์ การ์ตูน</option>
+<option value="historical-movie">หนังประวัติศาสตร์</option>
+
+</select>
+
+<input type="number" id="startPage" value="1" min="1">
+
+<input type="number" id="endPage" value="1" min="1">
+
+<button class="fetch-btn" onclick="startHarvest()">
+🚀 เริ่มดึงข้อมูล
 </button>
 
-<div id="status"></div>
+<div class="status" id="status">
+พร้อมทำงาน
+</div>
 
-<pre id="output"></pre>
+</div>
+
+<div id="output" class="grid"></div>
 
 </div>
 
 <script>
 
-const GRAPHQL_URL = "https://api.doo-nang.com/graphql";
-
-let allMovies = [];
-
-
-// ===============================
-// ตรวจสอบ subtitle
-// ===============================
-
-async function checkSubtitleExists(url) {
-    try {
-        const res = await fetch(url, {
-            method: 'HEAD'
-        });
-
-        return res.ok;
-
-    } catch {
-        return false;
-    }
-}
+const GRAPHQL =
+"https://api.doo-nang.com/graphql";
 
 
-// ===============================
-// audio tracks
-// ===============================
+// ==========================
+// category map
+// ==========================
 
-function extractAudioTracks(m3u8Text) {
+const categoryMap = {
 
-    const audioTracks = [];
+    movie:
+    "https://www.doo-nang.com/%e0%b8%ab%e0%b8%99%e0%b8%b1%e0%b8%87%e0%b8%ad%e0%b8%ad%e0%b8%99%e0%b9%84%e0%b8%a5%e0%b8%99%e0%b9%8c/",
 
-    const regex =
-/#EXT-X-MEDIA:TYPE=AUDIO.*?LANGUAGE="([^"]+)".*?URI="([^"]+)"/g;
+    "thai-movie":
+    "https://www.doo-nang.com/ดูหนังออนไลน์/?type=movie-tag&value=ไทย",
 
-    let match;
+    "korean-movie":
+    "https://www.doo-nang.com/ดูหนังออนไลน์/?type=movie-tag&value=เกาหลี",
 
-    while ((match = regex.exec(m3u8Text)) !== null) {
+    "japanese-movie":
+    "https://www.doo-nang.com/ดูหนังออนไลน์/?type=movie-tag&value=ญี่ปุ่น",
 
-        audioTracks.push({
-            language: match[1],
-            uri: match[2]
-        });
-    }
+    "indian-movie":
+    "https://www.doo-nang.com/ดูหนังออนไลน์/?type=movie-tag&value=อินเดีย",
 
-    return audioTracks;
-}
+    "cartoon-movie":
+    "https://www.doo-nang.com/ดูหนังออนไลน์/?type=movie-tag&value=การ์ตูน",
+
+    "historical-movie":
+    "https://www.doo-nang.com/ดูหนังออนไลน์/?type=movie-tag&value=ประวัติศาสตร์"
+};
 
 
 
-// ===============================
-// process movie video
-// ===============================
+// ==========================
+// request html
+// ==========================
 
-async function processMovie(movie) {
+async function request(url){
 
-    const transcodeUuid = movie.video?.transcodeUuid;
-    const cdnHostname = movie.video?.cdnHostname;
+    const res = await fetch(url);
 
-    if (!transcodeUuid || !cdnHostname) {
-        return null;
-    }
-
-    const base = `https://${cdnHostname}/${transcodeUuid}`;
-
-    const videoUrl =
-`https://api.doo-nang.com/video/${transcodeUuid}/playlist.m3u8`;
-
-    let subtitles = [];
-
-    let audioTracks = [];
-
-
-    // subtitle
-
-    if (movie.video?.subtitleMetadata) {
-
-        for (const [lang, subs] of Object.entries(movie.video.subtitleMetadata)) {
-
-            for (const sub of subs) {
-
-                const src =
-`${base}/${sub.pathName}.${sub.codec.toLowerCase()}`;
-
-                if (await checkSubtitleExists(src)) {
-
-                    subtitles.push({
-                        lang,
-                        codec: sub.codec,
-                        src
-                    });
-
-                }
-            }
-        }
-    }
-
-
-    // audio tracks
-
-    try {
-
-        const res = await fetch(videoUrl);
-
-        if (res.ok) {
-
-            const text = await res.text();
-
-            audioTracks = extractAudioTracks(text);
-        }
-
-    } catch {}
-
-
-    return {
-        id: movie.id,
-        title: movie.titleTh || movie.titleEn,
-        year: movie.releaseDate?.substring(0,4) || "0000",
-        poster: movie.posterUrl,
-        plot: movie.synopsisTh || "-",
-        video: videoUrl,
-        subtitles,
-        audioTracks
-    };
+    return await res.text();
 }
 
 
 
-// ===============================
-// fetch movie by id
-// ===============================
+// ==========================
+// fetch movie
+// ==========================
 
-async function fetchMovie(id) {
+async function fetchMovie(id){
 
-    const query = `
+const query = `
 
-    query getMovie($id: Int!) {
+query getMovie($id:Int!){
 
-        movie(id: $id) {
+movie(id:$id){
 
-            id
-            titleTh
-            titleEn
-            nation
-            synopsisTh
-            descriptionTh
-            releaseDate
-            posterUrl
+id
+titleTh
+titleEn
+synopsisTh
+posterUrl
+releaseDate
 
-            video {
-                transcodeUuid
-                cdnHostname
-                subtitleMetadata
-            }
-        }
-    }
-    `;
-
-
-    try {
-
-        const response = await fetch(GRAPHQL_URL, {
-
-            method: "POST",
-
-            headers: {
-                "Content-Type": "application/json"
-            },
-
-            body: JSON.stringify({
-                query,
-                variables: {
-                    id
-                }
-            })
-        });
-
-        const result = await response.json();
-
-        const movie = result?.data?.movie;
-
-        if (!movie) {
-            return null;
-        }
-
-        return await processMovie(movie);
-
-    } catch (err) {
-
-        console.log("ERROR ID:", id);
-
-        return null;
-    }
+video{
+transcodeUuid
+cdnHostname
 }
 
-
-
-// ===============================
-// generate m3u
-// ===============================
-
-function generateM3U(movies) {
-
-    let m3u = "#EXTM3U\n";
-
-    movies.forEach(movie => {
-
-        if (!movie?.video) return;
-
-        m3u +=
-`#EXTINF:-1 group-title="Movies" tvg-logo="${movie.poster}", ${movie.title} (${movie.year})\n`;
-
-        m3u += `${movie.video}\n`;
-
-    });
-
-    return m3u;
 }
-
-
-
-// ===============================
-// start scraper
-// ===============================
-
-async function startScraping() {
-
-    allMovies = [];
-
-    const output = document.getElementById("output");
-
-    const status = document.getElementById("status");
-
-
-    output.textContent = "";
-
-    status.innerHTML = "กำลังดึงข้อมูล...";
-
-
-    // เปลี่ยน range ได้
-    // ยิ่งเยอะยิ่งนาน
-
-    const START_ID = 1;
-    const END_ID = 15000;
-
-
-    for (let id = START_ID; id <= END_ID; id++) {
-
-        status.innerHTML =
-`กำลังดึง Movie ID: ${id}`;
-
-        const movie = await fetchMovie(id);
-
-        if (movie) {
-
-            allMovies.push(movie);
-
-            output.textContent =
-generateM3U(allMovies);
-
-            console.log("FOUND:", movie.title);
-        }
-
-
-        // delay กันยิงหนักเกิน
-
-        await new Promise(r => setTimeout(r, 150));
-    }
-
-
-    status.innerHTML =
-`เสร็จสิ้น พบหนัง ${allMovies.length} เรื่อง`;
-
-
-    downloadM3U();
 }
+`;
 
+try{
 
+const res = await fetch(GRAPHQL,{
 
-// ===============================
-// download
-// ===============================
+method:"POST",
 
-function downloadM3U() {
+headers:{
+"Content-Type":"application/json"
+},
 
-    const m3u = generateM3U(allMovies);
+body:JSON.stringify({
+query,
+variables:{id}
+})
 
-    const blob =
-new Blob([m3u], {
-    type:'text/plain'
 });
 
-    const url =
-window.URL.createObjectURL(blob);
+const json = await res.json();
 
-    const a =
-document.createElement('a');
+const movie = json?.data?.movie;
 
-    a.href = url;
+if(!movie) return null;
 
-    a.download = "doo-nang-movies.m3u";
+const uuid = movie.video?.transcodeUuid;
+const host = movie.video?.cdnHostname;
 
-    a.click();
+if(!uuid || !host) return null;
+
+return {
+
+id:movie.id,
+
+title:
+movie.titleTh ||
+movie.titleEn,
+
+plot:
+movie.synopsisTh || "-",
+
+poster:
+movie.posterUrl,
+
+year:
+movie.releaseDate?.substring(0,4),
+
+video:
+`https://api.doo-nang.com/video/${uuid}/playlist.m3u8`
+
+};
+
+}catch{
+
+return null;
+
+}
+
 }
 
 
 
-// ===============================
+// ==========================
+// parse page
+// ==========================
+
+async function parsePage(url){
+
+const html = await request(url);
+
+const ids =
+[
+...html.matchAll(/movie\/(\d+)/g)
+]
+.map(x=>x[1]);
+
+return [...new Set(ids)];
+
+}
+
+
+
+// ==========================
+// start
+// ==========================
+
+async function startHarvest(){
+
+const category =
+document.getElementById("category").value;
+
+const startPage =
+parseInt(
+document.getElementById("startPage").value
+);
+
+const endPage =
+parseInt(
+document.getElementById("endPage").value
+);
+
+const output =
+document.getElementById("output");
+
+const status =
+document.getElementById("status");
+
+output.innerHTML = "";
+
+let total = 0;
+
+for(let p=startPage;p<=endPage;p++){
+
+status.innerHTML =
+`🔍 กำลังสแกนหน้า ${p}`;
+
+let pageUrl =
+categoryMap[category];
+
+if(p > 1){
+pageUrl += `page/${p}/`;
+}
+
+const ids =
+await parsePage(pageUrl);
+
+for(let i=0;i<ids.length;i++){
+
+status.innerHTML =
+`🎬 หน้า ${p} | เรื่อง ${i+1}/${ids.length}`;
+
+const movie =
+await fetchMovie(ids[i]);
+
+if(movie){
+
+renderMovie(movie,p);
+
+total++;
+
+}
+
+await new Promise(r=>setTimeout(r,100));
+
+}
+
+}
+
+status.innerHTML =
+`✅ เสร็จสิ้น พบ ${total} เรื่อง`;
+
+}
+
+
+
+// ==========================
+// render
+// ==========================
+
+function renderMovie(movie,page){
+
+const m3u =
+
+`#EXTM3U
+
+#EXTINF:-1 tvg-logo="${movie.poster}" group-title="Movies", ${movie.title}
+${movie.video}`;
+
+const json =
+JSON.stringify(movie,null,2);
+
+const card =
+document.createElement("div");
+
+card.className = "card";
+
+card.innerHTML = `
+
+<img class="poster" src="${movie.poster}">
+
+<div class="card-body">
+
+<div class="meta">
+หน้า ${page}
+</div>
+
+<div class="title">
+${movie.title}
+</div>
+
+<div class="meta">
+${movie.year}
+</div>
+
+<button class="view-btn"
+onclick="toggleBox(this)">
+📂 แสดง M3U Playlist
+</button>
+
+<pre>${m3u}</pre>
+
+<button class="view-btn"
+onclick="toggleBox(this)">
+📦 แสดง JSON
+</button>
+
+<pre>${json}</pre>
+
+</div>
+`;
 
 document
-.getElementById("startBtn")
-.addEventListener("click", startScraping);
+.getElementById("output")
+.appendChild(card);
+
+}
+
+
+
+// ==========================
+// toggle
+// ==========================
+
+function toggleBox(btn){
+
+const pre =
+btn.nextElementSibling;
+
+const isOpen =
+pre.style.display === "block";
+
+pre.style.display =
+isOpen ? "none" : "block";
+
+btn.textContent =
+isOpen
+?
+btn.textContent.includes("JSON")
+? "📦 แสดง JSON"
+: "📂 แสดง M3U Playlist"
+
+:
+btn.textContent.includes("JSON")
+? "✖ ปิด JSON"
+: "✖ ปิด Playlist";
+
+}
 
 </script>
 
