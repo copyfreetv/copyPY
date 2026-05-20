@@ -4,14 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>Doo-Nang Series Parser</title>
+<title>Doo-Nang Explorer</title>
 
 <style>
+
 :root{
   --green:#63ff00;
   --bg:#0f0f0f;
   --card:#1a1a1a;
-  --border:#2a2a2a;
 }
 
 *{
@@ -26,35 +26,33 @@ body{
 }
 
 .container{
-  max-width:1100px;
+  max-width:1400px;
   margin:auto;
   padding:20px;
 }
 
-h1{
-  color:var(--green);
-  margin-bottom:20px;
-}
-
-.top{
+.topbar{
   display:flex;
   gap:10px;
   margin-bottom:20px;
 }
 
-input{
-  flex:1;
+input,select{
   padding:12px;
   background:#1f1f1f;
   border:1px solid #333;
   color:#fff;
-  border-radius:8px;
+  border-radius:10px;
+}
+
+input{
+  flex:1;
 }
 
 button{
   padding:12px 20px;
   border:none;
-  border-radius:8px;
+  border-radius:10px;
   cursor:pointer;
   font-weight:bold;
 }
@@ -64,9 +62,40 @@ button{
   color:#000;
 }
 
-.download-btn{
-  background:#0080ff;
-  color:#fff;
+.grid{
+  display:grid;
+  grid-template-columns:
+  repeat(auto-fill,minmax(220px,1fr));
+  gap:20px;
+}
+
+.card{
+  background:var(--card);
+  border-radius:15px;
+  overflow:hidden;
+  border:1px solid #2a2a2a;
+}
+
+.poster{
+  width:100%;
+  height:320px;
+  object-fit:cover;
+}
+
+.content{
+  padding:15px;
+}
+
+.title{
+  font-size:16px;
+  font-weight:bold;
+  margin-bottom:10px;
+  min-height:45px;
+}
+
+.btn{
+  width:100%;
+  margin-top:8px;
 }
 
 pre{
@@ -76,22 +105,11 @@ pre{
   border-radius:10px;
   overflow:auto;
   max-height:500px;
-  border:1px solid #333;
   font-size:12px;
 }
 
-.card{
-  background:var(--card);
-  border:1px solid var(--border);
-  padding:20px;
-  border-radius:15px;
-  margin-bottom:20px;
-}
-
-.title{
-  color:var(--green);
-  margin-bottom:10px;
-  font-size:22px;
+.section{
+  margin-top:30px;
 }
 
 .loader{
@@ -107,31 +125,41 @@ pre{
 
 <div class="container">
 
-<h1>Doo-Nang Series Parser</h1>
+<h1 style="color:#63ff00">
+Doo-Nang Explorer
+</h1>
 
-<div class="card">
+<div class="topbar">
 
-<div class="top">
+<select id="mode">
+
+<option value="series">
+ซีรีย์
+</option>
+
+<option value="movie">
+หนัง
+</option>
+
+</select>
 
 <input
 id="showId"
-type="number"
-placeholder="ใส่ Show ID เช่น 7714"
+placeholder="ใส่ ID เช่น 7714"
 />
 
 <button
 class="fetch-btn"
-onclick="startFetch()"
+onclick="fetchById()"
 >
-ดึงข้อมูล
+ดึงด้วย ID
 </button>
 
 <button
-class="download-btn"
-id="downloadBtn"
-style="display:none"
+class="fetch-btn"
+onclick="loadLatest()"
 >
-ดาวน์โหลด .m3u
+โหลดล่าสุด
 </button>
 
 </div>
@@ -143,33 +171,36 @@ id="loader"
 กำลังโหลด...
 </div>
 
-</div>
+<div
+class="grid"
+id="grid"
+></div>
 
 <div
-class="card"
-id="m3uCard"
+class="section"
+id="jsonSection"
 style="display:none"
 >
 
-<div class="title">
-M3U Playlist
-</div>
-
-<pre id="m3uOutput"></pre>
-
-</div>
-
-<div
-class="card"
-id="jsonCard"
-style="display:none"
->
-
-<div class="title">
-JSON Data
-</div>
+<h2 style="color:#63ff00">
+JSON Output
+</h2>
 
 <pre id="jsonOutput"></pre>
+
+</div>
+
+<div
+class="section"
+id="m3uSection"
+style="display:none"
+>
+
+<h2 style="color:#63ff00">
+M3U Output
+</h2>
+
+<pre id="m3uOutput"></pre>
 
 </div>
 
@@ -177,151 +208,150 @@ JSON Data
 
 <script>
 
-const nationMap = {
-  TH:"ซีรีส์ ไทย",
-  KR:"ซีรีส์ เกาหลี",
-  JP:"ซีรีส์ ญี่ปุ่น",
-  US:"ซีรีส์ อเมริกา"
-};
+// ========================================
+// CONFIG
+// ========================================
+
+const GRAPHQL =
+"https://api.doo-nang.com/graphql";
 
 
 
-// ======================================
-// Extract Audio Tracks
-// ======================================
+// ========================================
+// FETCH GRAPHQL
+// ========================================
 
-function extractAudioTracks(text){
+async function gql(query,variables={}){
 
-  const tracks = [];
+  const res =
+  await fetch(GRAPHQL,{
+    method:"POST",
+    headers:{
+      "Content-Type":"application/json"
+    },
+    body:JSON.stringify({
+      query,
+      variables
+    })
+  });
 
-  const regex =
-  /#EXT-X-MEDIA:TYPE=AUDIO.*?LANGUAGE="([^"]+)".*?URI="([^"]+)"/g;
-
-  let match;
-
-  while((match = regex.exec(text)) !== null){
-
-    tracks.push({
-      language: match[1],
-      uri: match[2]
-    });
-
-  }
-
-  return tracks;
+  return await res.json();
 
 }
 
 
 
-// ======================================
-// Parse Quality URL
-// ======================================
+// ========================================
+// PARSE MASTER PLAYLIST
+// ========================================
 
-function parseBestQuality(m3u8Text){
+async function getBestStream(url){
 
-  const qualities = [
+  try{
 
-    /https:\/\/[^\n]+1080p\.m3u8/g,
+    const res =
+    await fetch(url);
 
-    /https:\/\/[^\n]+720p\.m3u8/g,
+    const text =
+    await res.text();
 
-    /https:\/\/[^\n]+480p\.m3u8/g
+    const qualities = [
 
-  ];
+      /https:\/\/[^\n]+1080p\.m3u8/g,
 
-  for(const q of qualities){
+      /https:\/\/[^\n]+720p\.m3u8/g,
 
-    const match = m3u8Text.match(q);
+      /https:\/\/[^\n]+480p\.m3u8/g
 
-    if(match && match[0]){
+    ];
 
-      return match[0];
+    for(const q of qualities){
 
-    }
+      const match =
+      text.match(q);
 
-  }
+      if(match){
 
-  return null;
-
-}
-
-
-
-// ======================================
-// Process Episode
-// ======================================
-
-async function processEpisode(ep){
-
-  const transcodeUuid =
-  ep.video?.transcodeUuid;
-
-  const cdnHostname =
-  ep.video?.cdnHostname;
-
-  let videoUrl = "";
-
-  let audioTracks = [];
-
-  if(transcodeUuid && cdnHostname){
-
-    const masterUrl =
-    `https://api.doo-nang.com/video/${transcodeUuid}/playlist.m3u8`;
-
-    try{
-
-      const res =
-      await fetch(masterUrl);
-
-      if(res.ok){
-
-        const text =
-        await res.text();
-
-        audioTracks =
-        extractAudioTracks(text);
-
-        const best =
-        parseBestQuality(text);
-
-        if(best){
-
-          videoUrl = best;
-
-        }else{
-
-          videoUrl = masterUrl;
-
-        }
+        return match[0];
 
       }
 
-    }catch(e){
-
-      console.log(e);
-
     }
+
+    return url;
+
+  }catch{
+
+    return url;
+
+  }
+
+}
+
+
+
+// ========================================
+// PROCESS SERIES
+// ========================================
+
+async function processSeries(show){
+
+  const stations = [];
+
+  const eps =
+  show.episodes || [];
+
+  const totalEp =
+  eps.length;
+
+  for(const ep of eps){
+
+    const uuid =
+    ep.video?.transcodeUuid;
+
+    if(!uuid) continue;
+
+    const master =
+`https://api.doo-nang.com/video/${uuid}/playlist.m3u8`;
+
+    const realUrl =
+    await getBestStream(master);
+
+    stations.push({
+
+      name:
+      `EP.${String(ep.episodeNo).padStart(2,"0")}`,
+
+      image:
+      ep.posterUrl ||
+      show.posterUrl,
+
+      url:
+      realUrl,
+
+      referer:
+      "",
+
+      info:
+      `HD | พากย์ไทย | EP 1 - ${totalEp}`,
+
+      playInNatPlayer:
+      "true"
+
+    });
 
   }
 
   return {
 
-    episode:
-    parseInt(ep.episodeNo || 1),
+    name:
+    show.titleTh ||
+    show.titleEn,
 
-    title:
-    ep.titleTh ||
-    ep.titleEn ||
-    `EP${ep.episodeNo}`,
+    image:
+    show.posterUrl,
 
-    video:
-    videoUrl,
-
-    poster:
-    ep.posterUrl,
-
-    audioTracks
+    stations
 
   };
 
@@ -329,183 +359,72 @@ async function processEpisode(ep){
 
 
 
-// ======================================
-// Fetch Series
-// ======================================
+// ========================================
+// PROCESS MOVIE
+// ========================================
 
-async function fetchSeriesById(showId){
+async function processMovie(show){
 
-  const query = `
+  const stations = [];
 
-query getShow($id:Int!){
+  const uuid =
+  show.video?.transcodeUuid;
 
-show(id:$id){
+  if(uuid){
 
-id
-titleTh
-titleEn
-nation
-posterUrl
-releaseDate
+    const master =
+`https://api.doo-nang.com/video/${uuid}/playlist.m3u8`;
 
-episodes{
+    const realUrl =
+    await getBestStream(master);
 
-seasonNo
-episodeNo
-titleTh
-titleEn
-posterUrl
+    stations.push({
 
-video{
-transcodeUuid
-cdnHostname
-}
+      name:"Movie",
 
-}
+      image:
+      show.posterUrl,
 
-}
+      url:
+      realUrl,
 
-}
+      referer:"",
 
-`;
+      info:"HD | พากย์ไทย",
 
-  const response =
-  await fetch(
-    "https://api.doo-nang.com/graphql",
-    {
-      method:"POST",
-      headers:{
-        "Content-Type":"application/json"
-      },
-      body:JSON.stringify({
-        query,
-        variables:{
-          id:parseInt(showId)
-        }
-      })
-    }
-  );
+      playInNatPlayer:"true"
 
-  const result =
-  await response.json();
-
-  const show =
-  result?.data?.show;
-
-  if(!show){
-
-    throw new Error("ไม่พบข้อมูล");
+    });
 
   }
 
-  const data = {
-
-    id:show.id,
+  return {
 
     name:
     show.titleTh ||
     show.titleEn,
 
-    poster:
+    image:
     show.posterUrl,
 
-    category:
-    nationMap[show.nation] ||
-    "ซีรีส์",
-
-    seasons:[]
+    stations
 
   };
 
-  const seasonMap = {};
-
-  const tasks =
-  (show.episodes || []).map(async ep=>{
-
-    const seasonNo =
-    parseInt(ep.seasonNo || 1);
-
-    const processed =
-    await processEpisode(ep);
-
-    if(!seasonMap[seasonNo]){
-
-      seasonMap[seasonNo] = {
-
-        season:seasonNo,
-
-        episodes:[]
-
-      };
-
-    }
-
-    seasonMap[seasonNo]
-    .episodes
-    .push(processed);
-
-  });
-
-  await Promise.all(tasks);
-
-  data.seasons =
-  Object.values(seasonMap);
-
-  return data;
-
 }
 
 
 
-// ======================================
-// Generate M3U
-// ======================================
+// ========================================
+// FETCH BY ID
+// ========================================
 
-function generateM3U(data){
+async function fetchById(){
 
-  let m3u = "#EXTM3U\n\n";
-
-  data.seasons.forEach(season=>{
-
-    season.episodes.sort(
-      (a,b)=>a.episode-b.episode
-    );
-
-    season.episodes.forEach(ep=>{
-
-      if(!ep.video) return;
-
-      const S =
-      String(season.season)
-      .padStart(2,"0");
-
-      const E =
-      String(ep.episode)
-      .padStart(2,"0");
-
-      m3u +=
-`#EXTINF:-1 type="series" group-title="${data.name}" tvg-logo="${data.poster}",${data.name} S${S}E${E} - ${ep.title}
-#EXTVLCOPT:http-referrer=https://www.doo-nang.com/
-#EXTVLCOPT:http-origin=https://www.doo-nang.com
-${ep.video}
-
-`;
-
-    });
-
-  });
-
-  return m3u;
-
-}
-
-
-
-// ======================================
-// Start
-// ======================================
-
-async function startFetch(){
+  const mode =
+  document
+  .getElementById("mode")
+  .value;
 
   const id =
   document
@@ -514,87 +433,283 @@ async function startFetch(){
 
   if(!id){
 
-    alert("กรุณาใส่ ID");
+    alert("ใส่ ID");
 
     return;
 
   }
 
-  document
-  .getElementById("loader")
-  .style.display = "block";
+  showLoader(true);
 
   try{
 
-    const data =
-    await fetchSeriesById(id);
+    const query = `
 
-    const m3u =
-    generateM3U(data);
+query getShow($id:Int!){
 
-    document
-    .getElementById("m3uOutput")
-    .textContent = m3u;
+show(id:$id){
 
-    document
-    .getElementById("jsonOutput")
-    .textContent =
-    JSON.stringify(
-      data,
-      null,
-      2
-    );
+id
+titleTh
+titleEn
+posterUrl
 
-    document
-    .getElementById("m3uCard")
-    .style.display = "block";
+video{
+transcodeUuid
+}
 
-    document
-    .getElementById("jsonCard")
-    .style.display = "block";
+episodes{
 
+episodeNo
+posterUrl
 
+video{
+transcodeUuid
+}
 
-    // download
+}
 
-    const btn =
-    document
-    .getElementById("downloadBtn");
+}
 
-    btn.style.display = "inline-block";
+}
 
-    btn.onclick = ()=>{
+`;
 
-      const blob =
-      new Blob(
-        [m3u],
-        {type:"text/plain"}
-      );
+    const res =
+    await gql(query,{
+      id:parseInt(id)
+    });
 
-      const url =
-      URL.createObjectURL(blob);
+    const show =
+    res.data.show;
 
-      const a =
-      document.createElement("a");
+    let data;
 
-      a.href = url;
+    if(mode === "series"){
 
-      a.download =
-      `${data.name}.m3u`;
+      data =
+      await processSeries(show);
 
-      a.click();
+    }else{
 
-    };
+      data =
+      await processMovie(show);
 
-  }catch(err){
+    }
 
-    alert(err.message);
+    renderSingle(show,data);
+
+  }catch(e){
+
+    alert(e.message);
 
   }
 
+  showLoader(false);
+
+}
+
+
+
+// ========================================
+// LOAD LATEST
+// ========================================
+
+async function loadLatest(){
+
+  const mode =
+  document
+  .getElementById("mode")
+  .value;
+
+  showLoader(true);
+
+  const query = `
+
+query{
+
+search(
+limit:20
+sort:"releaseDate:DESC"
+){
+
+items{
+
+id
+titleTh
+titleEn
+posterUrl
+
+video{
+transcodeUuid
+}
+
+episodes{
+
+episodeNo
+posterUrl
+
+video{
+transcodeUuid
+}
+
+}
+
+}
+
+}
+
+}
+
+`;
+
+  try{
+
+    const res =
+    await gql(query);
+
+    const items =
+    res.data.search.items;
+
+    renderGrid(items,mode);
+
+  }catch(e){
+
+    alert(e.message);
+
+  }
+
+  showLoader(false);
+
+}
+
+
+
+// ========================================
+// RENDER GRID
+// ========================================
+
+function renderGrid(items,mode){
+
+  const grid =
+  document
+  .getElementById("grid");
+
+  grid.innerHTML = "";
+
+  items.forEach(item=>{
+
+    const div =
+    document.createElement("div");
+
+    div.className = "card";
+
+    div.innerHTML = `
+
+<img
+class="poster"
+src="${item.posterUrl}"
+>
+
+<div class="content">
+
+<div class="title">
+${item.titleTh || item.titleEn}
+</div>
+
+<button
+class="btn fetch-btn"
+onclick="openItem(${item.id})"
+>
+เปิด
+</button>
+
+</div>
+
+`;
+
+    grid.appendChild(div);
+
+  });
+
+}
+
+
+
+// ========================================
+// OPEN ITEM
+// ========================================
+
+async function openItem(id){
+
+  document
+  .getElementById("showId")
+  .value = id;
+
+  await fetchById();
+
+}
+
+
+
+// ========================================
+// RENDER SINGLE
+// ========================================
+
+function renderSingle(show,data){
+
+  document
+  .getElementById("jsonSection")
+  .style.display = "block";
+
+  document
+  .getElementById("jsonOutput")
+  .textContent =
+  JSON.stringify(
+    data,
+    null,
+    2
+  );
+
+
+
+  // M3U
+
+  let m3u =
+  "#EXTM3U\n\n";
+
+  data.stations.forEach(st=>{
+
+    m3u +=
+`#EXTINF:-1 group-title="${data.name}" tvg-logo="${st.image}",${st.name}
+${st.url}
+
+`;
+
+  });
+
+  document
+  .getElementById("m3uSection")
+  .style.display = "block";
+
+  document
+  .getElementById("m3uOutput")
+  .textContent = m3u;
+
+}
+
+
+
+// ========================================
+// LOADER
+// ========================================
+
+function showLoader(v){
+
   document
   .getElementById("loader")
-  .style.display = "none";
+  .style.display =
+  v ? "block" : "none";
 
 }
 
