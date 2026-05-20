@@ -1,31 +1,180 @@
+```javascript
 // api/proxy.js
+
 export default async function handler(req, res) {
-  const target = req.query.url;
-  if (!target) {
-    res.status(400).json({ error: "Missing url parameter" });
-    return;
+
+  // =====================================
+  // CORS
+  // =====================================
+
+  res.setHeader(
+    "Access-Control-Allow-Origin",
+    "*"
+  );
+
+  res.setHeader(
+    "Access-Control-Allow-Methods",
+    "GET, OPTIONS"
+  );
+
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "*"
+  );
+
+  if(req.method === "OPTIONS"){
+
+    return res.status(200).end();
+
   }
 
-  try {
-    const response = await fetch(target, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-        "Referer": "https://warpdooball.net/"
-      }
+
+
+  // =====================================
+  // URL
+  // =====================================
+
+  const target =
+  req.query.url;
+
+  if(!target){
+
+    return res.status(400).json({
+
+      error:"Missing url parameter"
+
     });
 
-    if (!response.ok) {
-      res.status(response.status).json({ error: "Failed to fetch target" });
-      return;
+  }
+
+
+
+  try{
+
+    // ===================================
+    // FETCH TARGET
+    // ===================================
+
+    const response =
+    await fetch(target,{
+
+      headers:{
+
+        "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+
+        "Referer":
+        "https://www.123-hds.com/",
+
+        "Origin":
+        "https://www.123-hds.com"
+
+      }
+
+    });
+
+
+
+    // ===================================
+    // CHECK STATUS
+    // ===================================
+
+    if(!response.ok){
+
+      return res.status(response.status).json({
+
+        error:"Failed to fetch target"
+
+      });
+
     }
 
-    const text = await response.text();
 
-    // อนุญาตให้ frontend เรียกได้
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.status(200).send(text);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+
+    // ===================================
+    // CONTENT TYPE
+    // ===================================
+
+    const contentType =
+    response.headers.get(
+      "content-type"
+    ) || "";
+
+
+
+    // ===================================
+    // TEXT
+    // ===================================
+
+    const text =
+    await response.text();
+
+
+
+    // ===================================
+    // M3U8
+    // ===================================
+
+    if(
+      contentType.includes(
+        "application/vnd.apple.mpegurl"
+      )
+      ||
+      target.includes(".m3u8")
+    ){
+
+      res.setHeader(
+        "Content-Type",
+        "application/vnd.apple.mpegurl"
+      );
+
+      return res.status(200).send(text);
+
+    }
+
+
+
+    // ===================================
+    // JSON
+    // ===================================
+
+    if(
+      contentType.includes(
+        "application/json"
+      )
+    ){
+
+      res.setHeader(
+        "Content-Type",
+        "application/json"
+      );
+
+      return res.status(200).send(text);
+
+    }
+
+
+
+    // ===================================
+    // HTML
+    // ===================================
+
+    res.setHeader(
+      "Content-Type",
+      "text/html; charset=utf-8"
+    );
+
+    return res.status(200).send(text);
+
+  }catch(err){
+
+    return res.status(500).json({
+
+      error:err.message
+
+    });
+
   }
+
 }
+```
