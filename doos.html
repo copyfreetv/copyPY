@@ -115,7 +115,7 @@ pre{
 .loader{
   display:none;
   margin:20px 0;
-  color:var(--green);
+  color:#63ff00;
 }
 
 </style>
@@ -445,31 +445,31 @@ async function fetchById(){
 
     const query = `
 
-query getShow($id:Int!){
+query getShow($id: ID!) {
 
-show(id:$id){
+  show(id: $id) {
 
-id
-titleTh
-titleEn
-posterUrl
+    id
+    titleTh
+    titleEn
+    posterUrl
 
-video{
-transcodeUuid
-}
+    video{
+      transcodeUuid
+    }
 
-episodes{
+    episodes{
 
-episodeNo
-posterUrl
+      episodeNo
+      posterUrl
 
-video{
-transcodeUuid
-}
+      video{
+        transcodeUuid
+      }
 
-}
+    }
 
-}
+  }
 
 }
 
@@ -477,11 +477,23 @@ transcodeUuid
 
     const res =
     await gql(query,{
-      id:parseInt(id)
+      id:id.toString()
     });
 
+    console.log(res);
+
     const show =
-    res.data.show;
+    res?.data?.show;
+
+    if(!show){
+
+      alert("ไม่พบข้อมูล");
+
+      showLoader(false);
+
+      return;
+
+    }
 
     let data;
 
@@ -501,6 +513,8 @@ transcodeUuid
 
   }catch(e){
 
+    console.log(e);
+
     alert(e.message);
 
   }
@@ -517,47 +531,42 @@ transcodeUuid
 
 async function loadLatest(){
 
-  const mode =
-  document
-  .getElementById("mode")
-  .value;
-
   showLoader(true);
 
   const query = `
 
-query{
+query {
 
-search(
-limit:20
-sort:"releaseDate:DESC"
-){
+  search(
+    limit:20
+    sort:"releaseDate:DESC"
+  ){
 
-items{
+    items{
 
-id
-titleTh
-titleEn
-posterUrl
+      id
+      titleTh
+      titleEn
+      posterUrl
 
-video{
-transcodeUuid
-}
+      video{
+        transcodeUuid
+      }
 
-episodes{
+      episodes{
 
-episodeNo
-posterUrl
+        episodeNo
+        posterUrl
 
-video{
-transcodeUuid
-}
+        video{
+          transcodeUuid
+        }
 
-}
+      }
 
-}
+    }
 
-}
+  }
 
 }
 
@@ -568,12 +577,16 @@ transcodeUuid
     const res =
     await gql(query);
 
-    const items =
-    res.data.search.items;
+    console.log(res);
 
-    renderGrid(items,mode);
+    const items =
+    res?.data?.search?.items || [];
+
+    renderGrid(items);
 
   }catch(e){
+
+    console.log(e);
 
     alert(e.message);
 
@@ -589,7 +602,7 @@ transcodeUuid
 // RENDER GRID
 // ========================================
 
-function renderGrid(items,mode){
+function renderGrid(items){
 
   const grid =
   document
@@ -608,13 +621,13 @@ function renderGrid(items,mode){
 
 <img
 class="poster"
-src="${item.posterUrl}"
+src="${item.posterUrl || ''}"
 >
 
 <div class="content">
 
 <div class="title">
-${item.titleTh || item.titleEn}
+${item.titleTh || item.titleEn || 'No Title'}
 </div>
 
 <button
@@ -682,6 +695,8 @@ function renderSingle(show,data){
 
     m3u +=
 `#EXTINF:-1 group-title="${data.name}" tvg-logo="${st.image}",${st.name}
+#EXTVLCOPT:http-referrer=https://www.doo-nang.com/
+#EXTVLCOPT:http-origin=https://www.doo-nang.com
 ${st.url}
 
 `;
