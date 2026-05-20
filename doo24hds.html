@@ -1,0 +1,812 @@
+```html
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport"
+content="width=device-width,initial-scale=1.0">
+
+<title>24-HDS Explorer</title>
+
+<style>
+
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+}
+
+body{
+background:#0b0b0b;
+color:#fff;
+font-family:tahoma;
+display:flex;
+min-height:100vh;
+}
+
+
+/* =========================
+SIDEBAR
+========================= */
+
+.sidebar{
+width:240px;
+background:#111;
+padding:20px;
+border-right:1px solid #222;
+position:fixed;
+top:0;
+left:0;
+height:100vh;
+overflow:auto;
+}
+
+.logo{
+font-size:28px;
+font-weight:bold;
+color:#ff9800;
+margin-bottom:30px;
+}
+
+.menu button{
+width:100%;
+padding:14px;
+margin-bottom:10px;
+border:none;
+background:#1f1f1f;
+color:#fff;
+text-align:left;
+border-radius:10px;
+cursor:pointer;
+transition:.2s;
+font-size:14px;
+}
+
+.menu button:hover{
+background:#ff9800;
+}
+
+
+/* =========================
+CONTENT
+========================= */
+
+.main{
+margin-left:240px;
+padding:25px;
+width:100%;
+}
+
+.topbar{
+display:flex;
+justify-content:space-between;
+align-items:center;
+margin-bottom:25px;
+gap:10px;
+flex-wrap:wrap;
+}
+
+.search{
+width:320px;
+padding:12px;
+border:none;
+border-radius:10px;
+background:#1f1f1f;
+color:#fff;
+}
+
+.status{
+color:#ff9800;
+font-size:14px;
+}
+
+
+/* =========================
+GRID
+========================= */
+
+.grid{
+display:grid;
+grid-template-columns:
+repeat(auto-fill,minmax(190px,1fr));
+gap:20px;
+}
+
+.card{
+background:#141414;
+border-radius:12px;
+overflow:hidden;
+transition:.25s;
+position:relative;
+border:1px solid #222;
+}
+
+.card:hover{
+transform:translateY(-5px);
+box-shadow:
+0 10px 25px rgba(0,0,0,.5);
+}
+
+.poster{
+width:100%;
+height:290px;
+object-fit:cover;
+background:#222;
+}
+
+.info{
+padding:12px;
+}
+
+.title{
+font-size:14px;
+font-weight:bold;
+margin-bottom:8px;
+line-height:1.4;
+height:40px;
+overflow:hidden;
+}
+
+.meta{
+font-size:12px;
+color:#bbb;
+margin-bottom:8px;
+}
+
+.badge{
+display:inline-block;
+padding:4px 8px;
+border-radius:6px;
+font-size:11px;
+background:#ff9800;
+margin-bottom:10px;
+}
+
+
+/* =========================
+BUTTONS
+========================= */
+
+.btn{
+width:100%;
+padding:10px;
+border:none;
+border-radius:8px;
+cursor:pointer;
+margin-top:8px;
+font-size:12px;
+font-weight:bold;
+}
+
+.btn-m3u{
+background:#2196f3;
+color:#fff;
+}
+
+.btn-json{
+background:#4caf50;
+color:#fff;
+}
+
+
+/* =========================
+MODAL
+========================= */
+
+.modal{
+position:fixed;
+inset:0;
+background:rgba(0,0,0,.8);
+display:none;
+justify-content:center;
+align-items:center;
+z-index:999;
+}
+
+.modal-content{
+width:90%;
+max-width:900px;
+background:#111;
+padding:20px;
+border-radius:14px;
+position:relative;
+}
+
+.close{
+position:absolute;
+right:15px;
+top:10px;
+font-size:25px;
+cursor:pointer;
+}
+
+pre{
+background:#000;
+padding:15px;
+border-radius:10px;
+overflow:auto;
+max-height:70vh;
+color:#00ff41;
+font-size:12px;
+white-space:pre-wrap;
+}
+
+
+/* =========================
+RESPONSIVE
+========================= */
+
+@media(max-width:768px){
+
+.sidebar{
+width:80px;
+}
+
+.main{
+margin-left:80px;
+}
+
+.logo{
+font-size:20px;
+}
+
+.menu button{
+font-size:0;
+height:50px;
+}
+
+.search{
+width:180px;
+}
+
+}
+
+</style>
+</head>
+
+<body>
+
+<!-- =========================
+SIDEBAR
+========================= -->
+
+<div class="sidebar">
+
+<div class="logo">
+🎬 24-HDS
+</div>
+
+<div class="menu">
+
+<button onclick="setCategory('latest')">
+หนังใหม่ 2026
+</button>
+
+<button onclick="setCategory('anime')">
+หนังการ์ตูน
+</button>
+
+<button onclick="setCategory('thai')">
+หนังไทย
+</button>
+
+<button onclick="setCategory('netflix')">
+Netflix
+</button>
+
+<button onclick="setCategory('series')">
+ซีรีย์
+</button>
+
+</div>
+
+</div>
+
+
+
+<!-- =========================
+CONTENT
+========================= -->
+
+<div class="main">
+
+<div class="topbar">
+
+<h1 id="pageTitle">
+24-HDS Explorer
+</h1>
+
+<input
+class="search"
+placeholder="ค้นหาหนัง..."
+oninput="searchMovie(this.value)">
+
+<div class="status" id="status">
+พร้อมทำงาน
+</div>
+
+</div>
+
+<div
+id="movieGrid"
+class="grid">
+</div>
+
+</div>
+
+
+
+<!-- =========================
+MODAL
+========================= -->
+
+<div
+id="modal"
+class="modal">
+
+<div class="modal-content">
+
+<span
+class="close"
+onclick="closeModal()">
+
+✖
+
+</span>
+
+<pre id="modalText"></pre>
+
+</div>
+
+</div>
+
+
+
+<script>
+
+// =====================================
+// CONFIG
+// =====================================
+
+const PROXY =
+"https://copy-py.vercel.app/api/proxy-24hd?url=";
+
+const BASE =
+"https://www.24-hds.com";
+
+let currentCategory =
+"latest";
+
+let allMovies = [];
+
+
+
+// =====================================
+// CATEGORY URL
+// =====================================
+
+const categoryMap = {
+
+latest:
+"https://www.24-hds.com/หนังใหม่-2026/",
+
+anime:
+"https://www.24-hds.com/หนังการ์ตูน/",
+
+thai:
+"https://www.24-hds.com/หนังไทย/",
+
+netflix:
+"https://www.24-hds.com/netflix/",
+
+series:
+"https://www.24-hds.com/series/"
+
+};
+
+
+
+// =====================================
+// REQUEST
+// =====================================
+
+async function request(url){
+
+const res =
+await fetch(
+PROXY +
+encodeURIComponent(url)
+);
+
+return await res.text();
+
+}
+
+
+
+// =====================================
+// EXTRACT M3U8
+// =====================================
+
+async function extractM3U8(url){
+
+try{
+
+const html =
+await request(url);
+
+const match =
+html.match(
+/https?:\/\/main\.24playerhd\.com\/newplaylist\/.*?\.m3u8/g
+);
+
+if(match){
+
+return match[0];
+
+}
+
+return "";
+
+}catch{
+
+return "";
+
+}
+
+}
+
+
+
+// =====================================
+// PARSE CATEGORY
+// =====================================
+
+async function parseCategory(){
+
+const status =
+document
+.getElementById("status");
+
+status.innerText =
+"กำลังโหลด...";
+
+const url =
+categoryMap[currentCategory];
+
+const html =
+await request(url);
+
+const doc =
+new DOMParser()
+.parseFromString(
+html,
+"text/html"
+);
+
+
+
+// =====================================
+// GET MOVIE CARDS
+// =====================================
+
+const cards =
+[
+...doc.querySelectorAll(
+".post-item"
+)
+];
+
+allMovies = [];
+
+let index = 0;
+
+for(const card of cards){
+
+index++;
+
+status.innerText =
+`กำลังดึง ${index}/${cards.length}`;
+
+const a =
+card.querySelector("a");
+
+const img =
+card.querySelector("img");
+
+if(!a || !img)
+continue;
+
+const title =
+img.alt ||
+a.title ||
+"Unknown";
+
+const poster =
+img.src ||
+img.dataset.src ||
+"";
+
+const detailUrl =
+a.href;
+
+
+// =====================================
+// YEAR
+// =====================================
+
+const yearMatch =
+title.match(/\((\d{4})\)/);
+
+const year =
+yearMatch
+?
+parseInt(yearMatch[1])
+:
+0;
+
+
+// =====================================
+// GET STREAM
+// =====================================
+
+const video =
+await extractM3U8(
+detailUrl
+);
+
+if(!video)
+continue;
+
+
+// =====================================
+// DETECT INFO
+// =====================================
+
+let info =
+"พากย์ไทย";
+
+const lower =
+title.toLowerCase();
+
+if(
+lower.includes("soundtrack")
+||
+lower.includes("ซับไทย")
+){
+
+info =
+"Soundtrack/ซับไทย";
+
+}
+
+
+allMovies.push({
+
+title,
+poster,
+video,
+year,
+info,
+
+nation:
+currentCategory
+
+});
+
+}
+
+
+
+// =====================================
+// SORT NEW -> OLD
+// =====================================
+
+allMovies.sort(
+(a,b)=>
+b.year - a.year
+);
+
+
+renderMovies();
+
+status.innerText =
+`โหลดเสร็จ ${allMovies.length} เรื่อง`;
+
+}
+
+
+
+// =====================================
+// RENDER
+// =====================================
+
+function renderMovies(){
+
+const grid =
+document
+.getElementById("movieGrid");
+
+grid.innerHTML = "";
+
+
+allMovies.forEach(movie=>{
+
+const card =
+document.createElement("div");
+
+card.className =
+"card";
+
+const m3u =
+
+`#EXTM3U
+#EXTINF:-1 tvg-id="" tvg-logo="${movie.poster}" group-title="${movie.nation}",${movie.title}
+${movie.video}`;
+
+const json =
+
+JSON.stringify({
+
+name:
+movie.title,
+
+image:
+movie.poster,
+
+url:
+movie.video,
+
+referer:
+"https://www.24-hds.com/",
+
+userAgent:
+"Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+
+info:
+movie.info
+
+},null,2);
+
+card.innerHTML = `
+
+<img
+class="poster"
+src="${movie.poster}">
+
+<div class="info">
+
+<div class="badge">
+${movie.year}
+</div>
+
+<div class="title">
+${movie.title}
+</div>
+
+<div class="meta">
+${movie.info}
+</div>
+
+<button
+class="btn btn-m3u"
+onclick='openModal(${JSON.stringify(m3u)})'>
+
+M3U Playlist
+
+</button>
+
+<button
+class="btn btn-json"
+onclick='openModal(${JSON.stringify(json)})'>
+
+JSON
+
+</button>
+
+</div>
+`;
+
+grid.appendChild(card);
+
+});
+
+}
+
+
+
+// =====================================
+// CATEGORY
+// =====================================
+
+function setCategory(cat){
+
+currentCategory =
+cat;
+
+document
+.getElementById("pageTitle")
+.innerText =
+cat;
+
+parseCategory();
+
+}
+
+
+
+// =====================================
+// SEARCH
+// =====================================
+
+function searchMovie(keyword){
+
+const cards =
+document
+.querySelectorAll(".card");
+
+cards.forEach(card=>{
+
+const title =
+card
+.querySelector(".title")
+.innerText
+.toLowerCase();
+
+card.style.display =
+
+title.includes(
+keyword.toLowerCase()
+)
+
+?
+"block"
+:
+"none";
+
+});
+
+}
+
+
+
+// =====================================
+// MODAL
+// =====================================
+
+function openModal(text){
+
+document
+.getElementById("modal")
+.style.display =
+"flex";
+
+document
+.getElementById("modalText")
+.textContent =
+text;
+
+}
+
+function closeModal(){
+
+document
+.getElementById("modal")
+.style.display =
+"none";
+
+}
+
+
+
+// =====================================
+// START
+// =====================================
+
+parseCategory();
+
+</script>
+
+</body>
+</html>
+```
