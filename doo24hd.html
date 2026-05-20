@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>ระบบดึงข้อมูลซีรีย์ 24-HDS Pro - Multi-Page</title>
+    <style>
+        :root { --gold: #ffeb3b; --bg: #0f0f0f; --card: #1e1e1e; --blue: #e91e63; }
+        body { font-family: 'Tahoma', sans-serif; background: var(--bg); color: #fff; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .control-panel { background: #222; padding: 20px; border-radius: 12px; margin-bottom: 25px; border-top: 4px solid var(--blue); }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 25px; }
+        .card { background: var(--card); border-radius: 15px; overflow: hidden; border: 1px solid #333; }
+        .card img { width: 100%; height: 220px; object-fit: cover; }
+        .card-body { padding: 15px; }
+        .card-title { font-size: 16px; font-weight: bold; color: var(--gold); margin-bottom: 8px; }
+        button { cursor: pointer; padding: 10px 20px; border: none; border-radius: 6px; color: white; background: var(--blue); font-weight: bold; }
+        pre { background: #000; color: #00ff41; padding: 10px; font-size: 11px; overflow-x: auto; max-height: 200px; display: none; border-radius: 5px; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1 style="text-align:center; color: var(--gold);">สคริปต์ดึงข้อมูลซีรีย์ 24-HDS (Multi-Page)</h1>
+    
+    <div class="control-panel">
+        <input type="number" id="startPage" value="1" style="padding:10px; width:60px;"> ถึง 
+        <input type="number" id="endPage" value="1" style="padding:10px; width:60px;">
+        <button onclick="startHarvesting()">🚀 เริ่มดึงข้อมูล</button>
+        <div id="loader" style="margin-top:10px;">📍 พร้อมทำงาน</div>
+    </div>
+
+    <div id="output" class="grid"></div>
+</div>
+
+<script>
+const PROXY = '/api/proxy-24hd?url=';
+const BASE_CAT = 'https://www.24-hds.com/series/';
+
+async function request(url) {
+    try {
+        const res = await fetch(PROXY + encodeURIComponent(url));
+        return await res.text();
+    } catch (e) { return null; }
+}
+
+async function startHarvesting() {
+    const start = parseInt(document.getElementById("startPage").value);
+    const end = parseInt(document.getElementById("endPage").value);
+    const output = document.getElementById("output");
+    output.innerHTML = "";
+
+    for (let p = start; p <= end; p++) {
+        const pageUrl = p === 1 ? BASE_CAT : `${BASE_CAT}page/${p}/`;
+        const html = await request(pageUrl);
+        if(!html) continue;
+
+        // ดึงลิงก์ซีรีย์จากหน้าหมวดหมู่
+        const regex = /href="(https:\/\/www\.24-hds\.com\/series\/[^"]+)"/g;
+        const matches = [...new Set([...html.matchAll(regex)].map(m => m[1]))];
+
+        for (let url of matches) {
+            const seriesHtml = await request(url);
+            if(!seriesHtml) continue;
+            
+            const doc = new DOMParser().parseFromString(seriesHtml, "text/html");
+            const title = doc.querySelector("h1")?.textContent.trim();
+            const poster = doc.querySelector(".poster img")?.src;
+            
+            // ดึงตอนทั้งหมด (ถ้าเว็บมีรายการตอนแบบปุ่ม หรือ iframe แยก)
+            // ใน 24-hds มักเป็นระบบ iframe ของ 24playerhd
+            const iframe = doc.querySelector("iframe");
+            let m3u = "#EXTM3U\n";
+            
+            if (iframe && iframe.src.includes("24playerhd.com")) {
+                const idMatch = iframe.src.match(/embed\/([^?\/]+)/);
+                if (idMatch) {
+                    const id = idMatch[1];
+                    m3u += `#EXTINF:-1 tvg-logo="${poster}" group-title="${title}", ${title} - Full\nhttps://main.24playerhd.com/newplaylist/${id}/${id}.m3u8\n`;
+                }
+            }
+
+            renderCard(title, poster, m3u);
+        }
+    }
+}
+
+function renderCard(title, poster, m3u) {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+        <img src="${poster}">
+        <div class="card-body">
+            <div class="card-title">${title}</div>
+            <button onclick="this.nextElementSibling.style.display = (this.nextElementSibling.style.display === 'block' ? 'none' : 'block')">📂 M3U Playlist</button>
+            <pre>${m3u}</pre>
+        </div>
+    `;
+    document.getElementById("output").appendChild(card);
+}
+</script>
+</body>
+</html>
