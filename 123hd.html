@@ -1,8 +1,14 @@
+```html
 <!DOCTYPE html>
 <html lang="th">
 <head>
+
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<meta
+name="viewport"
+content="width=device-width, initial-scale=1.0"
+>
 
 <title>123-HDS Parser</title>
 
@@ -58,7 +64,13 @@ pre{
   margin-top:20px;
 }
 
+img{
+  max-width:200px;
+  border-radius:10px;
+}
+
 </style>
+
 </head>
 
 <body>
@@ -69,12 +81,17 @@ pre{
 
 <input
 id="url"
-placeholder="วางลิงค์ซีรีย์ เช่น https://www.123-hds.com/series/xxxxx/"
+placeholder="วางลิงค์ซีรีย์"
 >
 
 <button onclick="startFetch()">
 ดึงข้อมูล
 </button>
+
+<div
+id="poster"
+style="margin-top:20px"
+></div>
 
 <div class="card">
 
@@ -145,11 +162,11 @@ function findIframe(html){
 
 function findM3U8(html){
 
-  // direct
+  // direct m3u8
 
   let match =
   html.match(
-    /https?:\/\/[^"' ]+\.m3u8[^"' ]*/g
+    /https?:\/\/[^"' ]+\.m3u8[^"' ]*/gi
   );
 
   if(match){
@@ -164,7 +181,7 @@ function findM3U8(html){
 
   match =
   html.match(
-    /https?:\\\/\\\/[^"]+\.m3u8[^"]*/g
+    /https?:\\\/\\\/[^"]+\.m3u8[^"]*/gi
   );
 
   if(match){
@@ -176,11 +193,56 @@ function findM3U8(html){
 
 
 
+  // main.24playerhd
+
+  match =
+  html.match(
+    /https?:\/\/main\.24playerhd\.com\/newplaylist\/[^"' ]+/gi
+  );
+
+  if(match){
+
+    return match[0];
+
+  }
+
+
+
+  // playlist/newplaylist
+
+  match =
+  html.match(
+    /https?:\/\/[^"' ]*(playlist|newplaylist)[^"' ]*\.m3u8[^"' ]*/gi
+  );
+
+  if(match){
+
+    return match[0];
+
+  }
+
+
+
   // source:"..."
 
   match =
   html.match(
-    /source\s*:\s*"([^"]+\.m3u8[^"]*)"/
+    /source\s*:\s*"([^"]+)"/i
+  );
+
+  if(match){
+
+    return match[1];
+
+  }
+
+
+
+  // file:"..."
+
+  match =
+  html.match(
+    /file\s*:\s*"([^"]+)"/i
   );
 
   if(match){
@@ -196,13 +258,17 @@ function findM3U8(html){
 
 
 // =====================================
-// PARSE EPISODES
+// PARSE SERIES
 // =====================================
 
 async function parseSeries(url){
 
   const html =
   await fetchHtml(url);
+
+  console.log(html);
+
+
 
   const parser =
   new DOMParser();
@@ -215,23 +281,45 @@ async function parseSeries(url){
 
 
 
-  // title
+  // ===================================
+  // TITLE
+  // ===================================
 
   const title =
-  doc.querySelector("h1")?.innerText ||
+  doc.querySelector("h1")
+  ?.innerText ||
   "Unknown";
 
 
 
-  // poster
+  // ===================================
+  // IMAGE
+  // ===================================
 
-  const image =
-  doc.querySelector("img")?.src ||
-  "";
+  let image =
+  doc.querySelector("img")
+  ?.src || "";
 
 
 
-  // links
+  // fix relative
+
+  if(
+    image &&
+    image.startsWith("/")
+  ){
+
+    image =
+    "https://www.123-hds.com" +
+    image;
+
+  }
+
+
+
+  // ===================================
+  // LINKS
+  // ===================================
 
   const links =
   [...doc.querySelectorAll("a")];
@@ -252,8 +340,6 @@ async function parseSeries(url){
 
 
 
-    // filter
-
     if(
       !text.includes("EP")
       &&
@@ -266,18 +352,18 @@ async function parseSeries(url){
 
     try{
 
-      // ================================
+      // =================================
       // episode page
-      // ================================
+      // =================================
 
       const epHtml =
       await fetchHtml(href);
 
 
 
-      // ================================
+      // =================================
       // iframe
-      // ================================
+      // =================================
 
       const iframe =
       findIframe(epHtml);
@@ -287,9 +373,9 @@ async function parseSeries(url){
 
 
 
-      // ================================
+      // =================================
       // fetch iframe
-      // ================================
+      // =================================
 
       if(iframe){
 
@@ -300,9 +386,13 @@ async function parseSeries(url){
 
 
 
-      // ================================
+      console.log(playerHtml);
+
+
+
+      // =================================
       // find m3u8
-      // ================================
+      // =================================
 
       const m3u8 =
       findM3U8(playerHtml);
@@ -411,12 +501,40 @@ async function startFetch(){
 
 
 
+  document
+  .getElementById("json")
+  .textContent =
+  "กำลังโหลด...";
+
+
+
+  document
+  .getElementById("m3u")
+  .textContent =
+  "";
+
+
+
   try{
 
     const data =
     await parseSeries(url);
 
 
+
+    // poster
+
+    document
+    .getElementById("poster")
+    .innerHTML =
+`
+<h2>${data.name}</h2>
+<img src="${data.image}">
+`;
+
+
+
+    // json
 
     document
     .getElementById("json")
@@ -428,6 +546,8 @@ async function startFetch(){
     );
 
 
+
+    // m3u
 
     document
     .getElementById("m3u")
@@ -448,3 +568,4 @@ async function startFetch(){
 
 </body>
 </html>
+```
