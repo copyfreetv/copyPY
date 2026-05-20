@@ -1,14 +1,9 @@
-```html
 <!DOCTYPE html>
 <html lang="th">
 <head>
 
 <meta charset="UTF-8">
-
-<meta
-name="viewport"
-content="width=device-width, initial-scale=1.0"
->
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <title>123-HDS Parser</title>
 
@@ -29,22 +24,35 @@ body{
 
 input{
   width:100%;
-  padding:12px;
+  padding:14px;
   background:#1f1f1f;
   border:1px solid #333;
   color:#fff;
   border-radius:10px;
   margin-bottom:15px;
+  font-size:16px;
 }
 
 button{
-  padding:12px 20px;
+  padding:14px 24px;
   border:none;
   border-radius:10px;
   background:#63ff00;
   color:#000;
   font-weight:bold;
   cursor:pointer;
+  font-size:16px;
+}
+
+button:hover{
+  opacity:.9;
+}
+
+.card{
+  background:#1a1a1a;
+  padding:20px;
+  border-radius:15px;
+  margin-top:20px;
 }
 
 pre{
@@ -55,18 +63,13 @@ pre{
   overflow:auto;
   margin-top:20px;
   max-height:600px;
+  white-space:pre-wrap;
 }
 
-.card{
-  background:#1a1a1a;
-  padding:20px;
-  border-radius:15px;
+.loading{
+  color:#63ff00;
   margin-top:20px;
-}
-
-img{
-  max-width:200px;
-  border-radius:10px;
+  font-size:18px;
 }
 
 </style>
@@ -81,17 +84,14 @@ img{
 
 <input
 id="url"
-placeholder="วางลิงค์ซีรีย์"
+placeholder="https://www.123-hds.com/zhan-zhao-adventures/"
 >
 
 <button onclick="startFetch()">
 ดึงข้อมูล
 </button>
 
-<div
-id="poster"
-style="margin-top:20px"
-></div>
+<div class="loading" id="loading"></div>
 
 <div class="card">
 
@@ -113,63 +113,57 @@ style="margin-top:20px"
 
 <script>
 
-// =====================================
+// ========================================
+// PROXY
+// ========================================
+
+const PROXY =
+"/api/proxy?url=";
+
+
+
+// ========================================
 // FETCH HTML
-// =====================================
+// ========================================
 
 async function fetchHtml(url){
 
-  const proxy =
-  "/api/proxy?url=";
+  try{
 
-  const res =
-  await fetch(
-    proxy + encodeURIComponent(url)
-  );
+    const res =
+    await fetch(
+      PROXY +
+      encodeURIComponent(url)
+    );
 
-  return await res.text();
+    return await res.text();
 
-}
+  }catch(err){
 
+    console.log(err);
 
-
-// =====================================
-// FIND IFRAME
-// =====================================
-
-function findIframe(html){
-
-  const match =
-  html.match(
-    /<iframe[^>]+src="([^"]+)"/i
-  );
-
-  if(match){
-
-    return match[1];
+    return "";
 
   }
 
-  return "";
-
 }
 
 
 
-// =====================================
+// ========================================
 // FIND M3U8
-// =====================================
+// ========================================
 
 function findM3U8(html){
 
-  // direct m3u8
+  // main.24playerhd.com/newplaylist/
 
   let match =
   html.match(
-    /https?:\/\/[^"' ]+\.m3u8[^"' ]*/gi
+/https?:\/\/main\.24playerhd\.com\/newplaylist\/[^"' ]+\.m3u8/gi
   );
 
-  if(match){
+  if(match && match.length){
 
     return match[0];
 
@@ -181,73 +175,13 @@ function findM3U8(html){
 
   match =
   html.match(
-    /https?:\\\/\\\/[^"]+\.m3u8[^"]*/gi
+/https?:\\\/\\\/main\.24playerhd\.com\\\/newplaylist\\\/[^"]+\.m3u8/gi
   );
 
-  if(match){
+  if(match && match.length){
 
     return match[0]
     .replaceAll("\\/","/");
-
-  }
-
-
-
-  // main.24playerhd
-
-  match =
-  html.match(
-    /https?:\/\/main\.24playerhd\.com\/newplaylist\/[^"' ]+/gi
-  );
-
-  if(match){
-
-    return match[0];
-
-  }
-
-
-
-  // playlist/newplaylist
-
-  match =
-  html.match(
-    /https?:\/\/[^"' ]*(playlist|newplaylist)[^"' ]*\.m3u8[^"' ]*/gi
-  );
-
-  if(match){
-
-    return match[0];
-
-  }
-
-
-
-  // source:"..."
-
-  match =
-  html.match(
-    /source\s*:\s*"([^"]+)"/i
-  );
-
-  if(match){
-
-    return match[1];
-
-  }
-
-
-
-  // file:"..."
-
-  match =
-  html.match(
-    /file\s*:\s*"([^"]+)"/i
-  );
-
-  if(match){
-
-    return match[1];
 
   }
 
@@ -257,18 +191,18 @@ function findM3U8(html){
 
 
 
-// =====================================
+// ========================================
 // PARSE SERIES
-// =====================================
+// ========================================
 
 async function parseSeries(url){
 
+  // ====================================
+  // SERIES PAGE
+  // ====================================
+
   const html =
   await fetchHtml(url);
-
-  console.log(html);
-
-
 
   const parser =
   new DOMParser();
@@ -281,45 +215,37 @@ async function parseSeries(url){
 
 
 
-  // ===================================
+  // ====================================
   // TITLE
-  // ===================================
+  // ====================================
 
   const title =
-  doc.querySelector("h1")
-  ?.innerText ||
+  doc.querySelector("h1")?.innerText ||
   "Unknown";
 
 
 
-  // ===================================
-  // IMAGE
-  // ===================================
+  // ====================================
+  // POSTER
+  // ====================================
 
-  let image =
-  doc.querySelector("img")
-  ?.src || "";
+  let image = "";
 
+  const img =
+  doc.querySelector("img");
 
-
-  // fix relative
-
-  if(
-    image &&
-    image.startsWith("/")
-  ){
+  if(img){
 
     image =
-    "https://www.123-hds.com" +
-    image;
+    img.src;
 
   }
 
 
 
-  // ===================================
-  // LINKS
-  // ===================================
+  // ====================================
+  // FIND EPISODE LINKS
+  // ====================================
 
   const links =
   [...doc.querySelectorAll("a")];
@@ -330,6 +256,10 @@ async function parseSeries(url){
 
 
 
+  // ====================================
+  // LOOP EPISODES
+  // ====================================
+
   for(const a of links){
 
     const href =
@@ -339,6 +269,12 @@ async function parseSeries(url){
     a.innerText.trim();
 
 
+
+    // ================================
+    // FILTER
+    // ================================
+
+    if(!href) continue;
 
     if(
       !text.includes("EP")
@@ -352,50 +288,76 @@ async function parseSeries(url){
 
     try{
 
-      // =================================
-      // episode page
-      // =================================
+      document
+      .getElementById("loading")
+      .innerText =
+      "กำลังดึง " + text;
+
+
+
+      // ================================
+      // FETCH EPISODE PAGE
+      // ================================
 
       const epHtml =
       await fetchHtml(href);
 
+      const epDoc =
+      parser.parseFromString(
+        epHtml,
+        "text/html"
+      );
 
 
-      // =================================
-      // iframe
-      // =================================
+
+      // ================================
+      // FIND IFRAME
+      // ================================
 
       const iframe =
-      findIframe(epHtml);
+      epDoc.querySelector("iframe");
 
-      let playerHtml =
-      epHtml;
+      if(!iframe){
 
+        console.log(
+          "ไม่เจอ iframe",
+          href
+        );
 
-
-      // =================================
-      // fetch iframe
-      // =================================
-
-      if(iframe){
-
-        playerHtml =
-        await fetchHtml(iframe);
+        continue;
 
       }
 
 
 
-      console.log(playerHtml);
+      // ================================
+      // IFRAME URL
+      // ================================
+
+      const iframeUrl =
+      iframe.src;
 
 
 
-      // =================================
-      // find m3u8
-      // =================================
+      // ================================
+      // FETCH PLAYER HTML
+      // ================================
+
+      const playerHtml =
+      await fetchHtml(
+        iframeUrl
+      );
+
+
+
+      // ================================
+      // FIND M3U8
+      // ================================
 
       const m3u8 =
-      findM3U8(playerHtml);
+      findM3U8(
+        playerHtml
+      );
 
 
 
@@ -405,6 +367,10 @@ async function parseSeries(url){
       );
 
 
+
+      // ================================
+      // PUSH
+      // ================================
 
       episodes.push({
 
@@ -425,15 +391,21 @@ async function parseSeries(url){
 
       });
 
-    }catch(e){
 
-      console.log(e);
+
+    }catch(err){
+
+      console.log(err);
 
     }
 
   }
 
 
+
+  // ====================================
+  // RETURN JSON
+  // ====================================
 
   return {
 
@@ -449,9 +421,9 @@ async function parseSeries(url){
 
 
 
-// =====================================
+// ========================================
 // BUILD M3U
-// =====================================
+// ========================================
 
 function buildM3U(data){
 
@@ -463,14 +435,16 @@ function buildM3U(data){
   data.stations.forEach(st=>{
 
     m3u +=
+
 `#EXTINF:-1 tvg-logo="${st.image}" group-title="${data.name}",${st.name}
 #EXTVLCOPT:http-referrer=https://www.123-hds.com/
-#EXTVLCOPT:http-origin=https://www.123-hds.com
 ${st.url}
 
 `;
 
   });
+
+
 
   return m3u;
 
@@ -478,16 +452,17 @@ ${st.url}
 
 
 
-// =====================================
+// ========================================
 // START
-// =====================================
+// ========================================
 
 async function startFetch(){
 
   const url =
   document
   .getElementById("url")
-  .value;
+  .value
+  .trim();
 
 
 
@@ -502,9 +477,16 @@ async function startFetch(){
 
 
   document
+  .getElementById("loading")
+  .innerText =
+  "กำลังโหลด...";
+
+
+
+  document
   .getElementById("json")
   .textContent =
-  "กำลังโหลด...";
+  "";
 
 
 
@@ -522,20 +504,6 @@ async function startFetch(){
 
 
 
-    // poster
-
-    document
-    .getElementById("poster")
-    .innerHTML =
-`
-<h2>${data.name}</h2>
-<img src="${data.image}">
-`;
-
-
-
-    // json
-
     document
     .getElementById("json")
     .textContent =
@@ -547,18 +515,25 @@ async function startFetch(){
 
 
 
-    // m3u
-
     document
     .getElementById("m3u")
     .textContent =
     buildM3U(data);
 
-  }catch(e){
 
-    console.log(e);
 
-    alert(e.message);
+    document
+    .getElementById("loading")
+    .innerText =
+    "โหลดเสร็จ";
+
+
+
+  }catch(err){
+
+    console.log(err);
+
+    alert(err.message);
 
   }
 
@@ -568,4 +543,3 @@ async function startFetch(){
 
 </body>
 </html>
-```
