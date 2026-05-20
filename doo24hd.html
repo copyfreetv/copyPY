@@ -1,111 +1,146 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-    <meta charset="UTF-8">
-    <title>ระบบดึงข้อมูล 24-HDS Pro - Full Scraper</title>
-    <style>
-        :root { --gold: #ffeb3b; --bg: #0f0f0f; --card: #1e1e1e; --blue: #e91e63; }
-        body { font-family: 'Tahoma', sans-serif; background: var(--bg); color: #fff; padding: 20px; }
-        .container { max-width: 1200px; margin: 0 auto; }
-        .control-panel { background: #222; padding: 20px; border-radius: 12px; margin-bottom: 25px; border-top: 4px solid var(--blue); }
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 25px; }
-        .card { background: var(--card); border-radius: 15px; overflow: hidden; border: 1px solid #333; }
-        .card img { width: 100%; height: 220px; object-fit: cover; }
-        .card-body { padding: 15px; }
-        .card-title { font-size: 16px; font-weight: bold; color: var(--gold); margin-bottom: 8px; }
-        button { cursor: pointer; padding: 10px 20px; border: none; border-radius: 6px; color: white; background: var(--blue); font-weight: bold; }
-        pre { background: #000; color: #00ff41; padding: 10px; font-size: 11px; overflow-x: auto; max-height: 200px; display: none; border-radius: 5px; margin-top: 10px; }
-    </style>
+  <meta charset="UTF-8">
+  <title>Doo-Nang Movie Parser</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f9f9f9; padding: 20px; }
+    pre { background: #222; color: #0f0; padding: 10px; overflow-x: auto; }
+    button { padding: 8px 12px; margin: 5px; border: none; border-radius: 4px; background: #0078d7; color: #fff; cursor: pointer; }
+  </style>
 </head>
 <body>
+  <h1>Doo-Nang Movie Parser</h1>
+  <input id="movieId" type="text" placeholder="กรอก Movie ID">
+  <button id="fetchBtn">ดึงข้อมูล</button>
+  <div id="output">รอรับข้อมูล...</div>
 
-<div class="container">
-    <h1 style="text-align:center; color: var(--gold);">สคริปต์ดึงข้อมูล 24-HDS (Fix API)</h1>
-    <div class="control-panel">
-        <input type="number" id="startPage" value="1" style="padding:10px; width:60px;"> ถึง 
-        <input type="number" id="endPage" value="1" style="padding:10px; width:60px;">
-        <button onclick="startHarvesting()">🚀 เริ่มดึงข้อมูล</button>
-        <div id="loader" style="margin-top:10px;">📍 พร้อมทำงาน</div>
-    </div>
-    <div id="output" class="grid"></div>
-</div>
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>Doo-Nang Movie Parser</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f9f9f9; padding: 20px; }
+    pre { background: #222; color: #0f0; padding: 10px; overflow-x: auto; }
+    button { padding: 8px 12px; margin: 5px; border: none; border-radius: 4px; background: #0078d7; color: #fff; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Doo-Nang Movie Parser</h1>
+  <input id="movieId" type="text" placeholder="กรอก Movie ID">
+  <button id="fetchBtn">ดึงข้อมูล</button>
+  <div id="output">รอรับข้อมูล...</div>
 
 <script>
-const PROXY = '/api/proxy-24hd?url=';
-const BASE_URL = 'https://www.24-hds.com';
+const nationMap = {
+  TH: "ภาพยนตร์ ไทย", KR: "ภาพยนตร์ เกาหลี", JP: "ภาพยนตร์ ญี่ปุ่น", IN: "ภาพยนตร์ อินเดีย",
+  US: "ภาพยนตร์ สหรัฐอเมริกา", CA: "ภาพยนตร์ แคนาดา", CN: "ภาพยนตร์ จีน", FR: "ภาพยนตร์ ฝรั่งเศส",
+  GB: "ภาพยนตร์ อังกฤษ", MY: "ภาพยนตร์ มาเลเซีย", ES: "ภาพยนตร์ สเปน", PH: "ภาพยนตร์ ฟิลิปปินส์",
+  IE: "ภาพยนตร์ ไอร์แลนด์", ID: "ภาพยนตร์ อินโดนีเซีย"
+};
 
-async function request(url, isJson = false) {
-    try {
-        const res = await fetch(PROXY + encodeURIComponent(url));
-        if (!res.ok) return null;
-        return isJson ? await res.json() : await res.text();
-    } catch (e) { return null; }
+async function checkSubtitleExists(url) {
+  try {
+    const res = await fetch(url, { method: 'HEAD' });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
-async function getStream(postId) {
-    // ดึงผ่าน API หลังบ้านของเว็บโดยตรง
-    const json = await request(`${BASE_URL}/wp-admin/admin-ajax.php?action=mix_get_player&post_id=${postId}`, true);
-    if (!json?.success || !json.player) return null;
-    
-    // สกัด ID จากโค้ด embed
-    const match = json.player.match(/embed\/([^"']+)/);
-    return match ? `https://main.24playerhd.com/newplaylist/${match[1]}/${match[1]}.m3u8` : null;
+function extractAudioTracks(m3u8Text) {
+  const audioTracks = [];
+  const regex = /#EXT-X-MEDIA:TYPE=AUDIO.*?LANGUAGE="([^"]+)".*?URI="([^"]+)"/g;
+  let match;
+  while ((match = regex.exec(m3u8Text)) !== null) {
+    audioTracks.push({ language: match[1], uri: match[2] });
+  }
+  return audioTracks;
 }
 
-async function startHarvesting() {
-    const start = parseInt(document.getElementById("startPage").value);
-    const end = parseInt(document.getElementById("endPage").value);
-    const output = document.getElementById("output");
-    const loader = document.getElementById("loader");
-    output.innerHTML = "";
-
-    for (let p = start; p <= end; p++) {
-        loader.textContent = `🔍 กำลังสแกนหน้า: ${p}`;
-        const pageUrl = p === 1 ? `${BASE_URL}/หนังใหม่-2026/` : `${BASE_URL}/หนังใหม่-2026/page/${p}/`;
-        const html = await request(pageUrl);
-        if(!html) continue;
-
-        // Regex จับลิงก์จากหน้าหมวดหมู่
-        const regex = /href="(https:\/\/www\.24-hds\.com\/movie\/[^"]+)"/g;
-        const matches = [...new Set([...html.matchAll(regex)].map(m => m[1]))];
-
-        for (let url of matches) {
-            const movieHtml = await request(url);
-            if(!movieHtml) continue;
-            
-            const doc = new DOMParser().parseFromString(movieHtml, "text/html");
-            const title = doc.querySelector("h1.entry-title")?.textContent.trim() || "ไม่ทราบชื่อ";
-            const poster = doc.querySelector(".post-thumbnail img")?.src || "";
-            
-            // หาปุ่มเลือกตอนเพื่อเอา post_id
-            const btn = doc.querySelector("button.ep");
-            const postId = btn ? btn.id : null;
-            
-            if (postId) {
-                const streamUrl = await getStream(postId);
-                if (streamUrl) {
-                    const m3u = `#EXTM3U\n#EXTINF:-1 tvg-logo="${poster}" group-title="${title}", ${title}\n${streamUrl}`;
-                    renderCard(title, poster, m3u);
-                }
-            }
-        }
+async function fetchMovieById(movieId) {
+  const query = `
+    query getMovie($id: Int!) {
+      movie(id: $id) {
+        id titleTh titleEn descriptionTh synopsisTh releaseDate posterUrl imdbRating slug nation
+        genres { name slug }
+        video { transcodeUuid cdnHostname }
+      }
     }
-    loader.textContent = "✅ ดึงข้อมูลสำเร็จ!";
+  `;
+
+  const response = await fetch('api.doo-nang.com/graphql?query=query+getMovies%28%24skip%3A+Int%21%2C+%24take%3A+Int%21%2C+%24where%3A+MovieWhereInput%29+%7B%0A++movies%28skip%3A+%24skip%2C+take%3A+%24take%2C+where%3A+%24where%2C+orderBy%3A+%7BcreatedAt%3A+desc%7D%29+%7B%0A++++items+%7B%0A++++++id%0A++++++titleTh%0A++++++titleEn%0A++++++synopsisTh%0A++++++descriptionTh%0A++++++releaseDate%0A++++++posterUrl%0A++++++backdropUrl%0A++++++rating%0A++++++imdbRating%0A++++++nation%0A++++++slug%0A++++++viewed%0A++++++video+%7B%0A++++++++previewUrl%0A++++++++duration%0A++++++++__typename%0A++++++%7D%0A++++++__typename%0A++++%7D%0A++++page%0A++++pages%0A++++perPage%0A++++total%0A++++__typename%0A++%7D%0A%7D&operationName=getMovies&variables=%7B%22skip%22%3A60%2C%22take%22%3A60%2C%22where%22%3A%7B%22tags%22%3A%7B%22some%22%3A%7B%22tag%22%3A%7B%22name%22%3A%7B%22equals%22%3A%22%E0%B9%84%E0%B8%97%E0%B8%A2%22%7D%7D%7D%7D%7D%7D', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, operationName: 'getMovie', variables: { id: movieId } })
+  });
+
+  const result = await response.json();
+  const movie = result?.data?.movie;
+  if (!movie) {
+    return { error: "❌ ไม่พบข้อมูลภาพยนตร์ id=" + movieId };
+  }
+
+  const genres = movie.genres?.map(g => g.name) || [];
+  const imdbRating = movie.imdbRating || '0.0';
+  const plot = movie.descriptionTh?.trim() || movie.synopsisTh?.trim() || '-';
+  const year = movie.releaseDate?.substring(0, 4) || '0000';
+  const category = nationMap[movie.nation] || "ภาพยนตร์ ทั่วไป";
+
+  const transcodeUuid = movie.video?.transcodeUuid;
+  const cdnHostname = movie.video?.cdnHostname;
+  const subtitle = [];
+  let audioTracks = [];
+  let videoUrl = "";
+
+  if (transcodeUuid && cdnHostname) {
+    const base = `https://${cdnHostname}/${transcodeUuid}`;
+    videoUrl = `https://api.doo-nang.com/video/${transcodeUuid}/playlist.m3u8`;
+
+    const subtitleVariants = [
+      { lang: "th", codec: "VTT", src: `${base}/sub_tha.vtt` },
+      { lang: "th", codec: "BDN", src: `${base}/sub_tha/index.xml` }
+    ];
+    for (const sub of subtitleVariants) {
+      if (await checkSubtitleExists(sub.src)) subtitle.push(sub);
+    }
+
+    try {
+      const res = await fetch(videoUrl);
+      if (res.ok) {
+        const m3u8Text = await res.text();
+        audioTracks = extractAudioTracks(m3u8Text);
+      }
+    } catch (e) {
+      console.warn("ไม่สามารถโหลด playlist.m3u8 ได้", e);
+    }
+  }
+
+  return {
+    id: movie.id,
+    name: `${movie.titleEn || movie.titleTh} - ${movie.titleTh || movie.titleEn}`,
+    category,
+    info: {
+      poster: movie.posterUrl,
+      genre: genres,
+      plot,
+      rating: imdbRating,
+      year
+    },
+    video: videoUrl,
+    subtitle,
+    audioTracks
+  };
 }
 
-function renderCard(title, poster, m3u) {
-    const card = document.createElement("div");
-    card.className = "card";
-    card.innerHTML = `
-        <img src="${poster}">
-        <div class="card-body">
-            <div class="card-title">${title}</div>
-            <button onclick="this.nextElementSibling.style.display = (this.nextElementSibling.style.display === 'block' ? 'none' : 'block')">📂 M3U Playlist</button>
-            <pre>${m3u}</pre>
-        </div>
-    `;
-    document.getElementById("output").appendChild(card);
-}
+document.getElementById("fetchBtn").addEventListener("click", async () => {
+  const id = parseInt(document.getElementById("movieId").value, 10);
+  const output = document.getElementById("output");
+  output.innerHTML = "⏳ กำลังโหลด...";
+  const data = await fetchMovieById(id);
+  output.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+});
 </script>
 </body>
 </html>
