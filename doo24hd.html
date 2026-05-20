@@ -2,26 +2,28 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <title>ระบบดึงข้อมูล 24-HDS (Updated)</title>
+    <title>ระบบดึงข้อมูล 24-HDS Pro - Full Scraper</title>
     <style>
-        body { font-family: 'Tahoma', sans-serif; background: #0f0f0f; color: #fff; padding: 20px; }
+        :root { --gold: #ffeb3b; --bg: #0f0f0f; --card: #1e1e1e; --blue: #e91e63; }
+        body { font-family: 'Tahoma', sans-serif; background: var(--bg); color: #fff; padding: 20px; }
         .container { max-width: 1200px; margin: 0 auto; }
-        .control-panel { background: #222; padding: 20px; border-radius: 12px; margin-bottom: 25px; border-top: 4px solid #e91e63; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
-        .card { background: #1e1e1e; border-radius: 12px; overflow: hidden; border: 1px solid #333; }
+        .control-panel { background: #222; padding: 20px; border-radius: 12px; margin-bottom: 25px; border-top: 4px solid var(--blue); }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 25px; }
+        .card { background: var(--card); border-radius: 15px; overflow: hidden; border: 1px solid #333; }
         .card img { width: 100%; height: 220px; object-fit: cover; }
         .card-body { padding: 15px; }
-        pre { background: #000; color: #00ff41; padding: 10px; font-size: 10px; overflow-x: auto; display: none; }
-        button { cursor: pointer; padding: 8px 15px; border: none; border-radius: 4px; background: #e91e63; color: white; font-weight: bold; }
+        .card-title { font-size: 16px; font-weight: bold; color: var(--gold); margin-bottom: 8px; }
+        button { cursor: pointer; padding: 10px 20px; border: none; border-radius: 6px; color: white; background: var(--blue); font-weight: bold; }
+        pre { background: #000; color: #00ff41; padding: 10px; font-size: 11px; overflow-x: auto; max-height: 200px; display: none; border-radius: 5px; margin-top: 10px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1 style="text-align:center; color: #ffeb3b;">ระบบดึงข้อมูล 24-HDS (Updated)</h1>
+    <h1 style="text-align:center; color: var(--gold);">สคริปต์ดึงข้อมูล 24-HDS (Fix API)</h1>
     <div class="control-panel">
-        <input type="number" id="startPage" value="1" style="width:50px;"> ถึง 
-        <input type="number" id="endPage" value="1" style="width:50px;">
+        <input type="number" id="startPage" value="1" style="padding:10px; width:60px;"> ถึง 
+        <input type="number" id="endPage" value="1" style="padding:10px; width:60px;">
         <button onclick="startHarvesting()">🚀 เริ่มดึงข้อมูล</button>
         <div id="loader" style="margin-top:10px;">📍 พร้อมทำงาน</div>
     </div>
@@ -32,11 +34,22 @@
 const PROXY = '/api/proxy-24hd?url=';
 const BASE_URL = 'https://www.24-hds.com';
 
-async function request(url) {
+async function request(url, isJson = false) {
     try {
         const res = await fetch(PROXY + encodeURIComponent(url));
-        return await res.text();
+        if (!res.ok) return null;
+        return isJson ? await res.json() : await res.text();
     } catch (e) { return null; }
+}
+
+async function getStream(postId) {
+    // ดึงผ่าน API หลังบ้านของเว็บโดยตรง
+    const json = await request(`${BASE_URL}/wp-admin/admin-ajax.php?action=mix_get_player&post_id=${postId}`, true);
+    if (!json?.success || !json.player) return null;
+    
+    // สกัด ID จากโค้ด embed
+    const match = json.player.match(/embed\/([^"']+)/);
+    return match ? `https://main.24playerhd.com/newplaylist/${match[1]}/${match[1]}.m3u8` : null;
 }
 
 async function startHarvesting() {
@@ -48,12 +61,11 @@ async function startHarvesting() {
 
     for (let p = start; p <= end; p++) {
         loader.textContent = `🔍 กำลังสแกนหน้า: ${p}`;
-        // ปรับ URL หมวดหมู่ตามที่ให้มา
         const pageUrl = p === 1 ? `${BASE_URL}/หนังใหม่-2026/` : `${BASE_URL}/หนังใหม่-2026/page/${p}/`;
         const html = await request(pageUrl);
         if(!html) continue;
 
-        // Regex ปรับให้ค้นหาจากโครงสร้างลิงก์รายการในหน้าหมวดหมู่
+        // Regex จับลิงก์จากหน้าหมวดหมู่
         const regex = /href="(https:\/\/www\.24-hds\.com\/movie\/[^"]+)"/g;
         const matches = [...new Set([...html.matchAll(regex)].map(m => m[1]))];
 
@@ -65,18 +77,17 @@ async function startHarvesting() {
             const title = doc.querySelector("h1.entry-title")?.textContent.trim() || "ไม่ทราบชื่อ";
             const poster = doc.querySelector(".post-thumbnail img")?.src || "";
             
-            // ดึง ID จาก iframe เพื่อสร้างลิงก์ M3U8
-            const iframe = doc.querySelector("iframe");
-            let m3u = "";
-            if (iframe && iframe.src.includes("24playerhd.com")) {
-                const idMatch = iframe.src.match(/embed\/([^?\/]+)/);
-                if (idMatch) {
-                    const id = idMatch[1];
-                    m3u = `#EXTM3U\n#EXTINF:-1 tvg-logo="${poster}" group-title="${title}", ${title}\nhttps://main.24playerhd.com/newplaylist/${id}/${id}.m3u8`;
+            // หาปุ่มเลือกตอนเพื่อเอา post_id
+            const btn = doc.querySelector("button.ep");
+            const postId = btn ? btn.id : null;
+            
+            if (postId) {
+                const streamUrl = await getStream(postId);
+                if (streamUrl) {
+                    const m3u = `#EXTM3U\n#EXTINF:-1 tvg-logo="${poster}" group-title="${title}", ${title}\n${streamUrl}`;
+                    renderCard(title, poster, m3u);
                 }
             }
-
-            if (m3u) renderCard(title, poster, m3u);
         }
     }
     loader.textContent = "✅ ดึงข้อมูลสำเร็จ!";
@@ -88,7 +99,7 @@ function renderCard(title, poster, m3u) {
     card.innerHTML = `
         <img src="${poster}">
         <div class="card-body">
-            <div style="font-weight:bold; margin-bottom:10px;">${title}</div>
+            <div class="card-title">${title}</div>
             <button onclick="this.nextElementSibling.style.display = (this.nextElementSibling.style.display === 'block' ? 'none' : 'block')">📂 M3U Playlist</button>
             <pre>${m3u}</pre>
         </div>
