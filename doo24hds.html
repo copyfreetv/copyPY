@@ -371,9 +371,6 @@ onclick="closeModal()">
 const PROXY =
 "https://copy-py.vercel.app/api/proxy-24hd?url=";
 
-const BASE =
-"https://www.24-hds.com";
-
 let currentCategory =
 "latest";
 
@@ -412,6 +409,8 @@ series:
 
 async function request(url){
 
+try{
+
 const res =
 await fetch(
 PROXY +
@@ -419,6 +418,14 @@ encodeURIComponent(url)
 );
 
 return await res.text();
+
+}catch(e){
+
+console.log(e);
+
+return "";
+
+}
 
 }
 
@@ -435,20 +442,29 @@ try{
 const html =
 await request(url);
 
-const match =
-html.match(
-/https?:\/\/main\.24playerhd\.com\/newplaylist\/.*?\.m3u8/g
-);
 
-if(match){
+// =====================================
+// FIND M3U8
+// =====================================
 
-return match[0];
+const matches =
+[
+...html.matchAll(
+/https?:\/\/main\.24playerhd\.com\/newplaylist\/[^"'\\]+\.m3u8/g
+)
+];
+
+if(matches.length){
+
+return matches[0][0];
 
 }
 
 return "";
 
-}catch{
+}catch(e){
+
+console.log(e);
 
 return "";
 
@@ -477,6 +493,8 @@ categoryMap[currentCategory];
 const html =
 await request(url);
 
+console.log(html);
+
 const doc =
 new DOMParser()
 .parseFromString(
@@ -492,10 +510,10 @@ html,
 
 const cards =
 [
-...doc.querySelectorAll(
-".post-item"
-)
+...doc.querySelectorAll("article")
 ];
+
+console.log(cards);
 
 allMovies = [];
 
@@ -520,6 +538,7 @@ continue;
 const title =
 img.alt ||
 a.title ||
+card.innerText ||
 "Unknown";
 
 const poster =
@@ -529,6 +548,9 @@ img.dataset.src ||
 
 const detailUrl =
 a.href;
+
+if(!detailUrl)
+continue;
 
 
 // =====================================
