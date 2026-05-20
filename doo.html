@@ -1,3 +1,4 @@
+```html id="8g7s4a"
 <!DOCTYPE html>
 <html lang="th">
 <head>
@@ -5,89 +6,74 @@
 <meta name="viewport"
 content="width=device-width, initial-scale=1.0">
 
-<title>Doo-Nang Movie Explorer</title>
+<title>Doo-Nang Category Scraper</title>
 
 <style>
 
-:root{
-    --bg:#0f0f0f;
-    --card:#1d1d1d;
-    --gold:#ffeb3b;
-    --blue:#2196f3;
-}
-
 body{
-    background:var(--bg);
+    background:#111;
     color:#fff;
-    font-family:tahoma;
+    font-family:Arial;
     padding:20px;
 }
 
 .container{
-    max-width:1400px;
+    max-width:1200px;
     margin:auto;
 }
 
 .control{
-    background:#1b1b1b;
+    background:#1d1d1d;
     padding:20px;
-    border-radius:12px;
-    margin-bottom:25px;
+    border-radius:10px;
+    margin-bottom:20px;
 }
 
 .grid{
     display:grid;
     grid-template-columns:
-    repeat(auto-fill,minmax(280px,1fr));
+    repeat(auto-fill,minmax(260px,1fr));
     gap:20px;
 }
 
 .card{
-    background:var(--card);
-    border-radius:14px;
+    background:#1e1e1e;
+    border-radius:12px;
     overflow:hidden;
     border:1px solid #333;
 }
 
 .poster{
     width:100%;
-    height:380px;
+    height:350px;
     object-fit:cover;
 }
 
-.card-body{
+.body{
     padding:15px;
 }
 
 .title{
-    color:var(--gold);
-    font-size:16px;
+    color:#ffeb3b;
     font-weight:bold;
-    margin-bottom:8px;
-}
-
-.meta{
-    color:#aaa;
-    font-size:12px;
     margin-bottom:10px;
 }
 
 button{
-    border:none;
     padding:10px;
     width:100%;
-    margin-top:8px;
+    border:none;
     border-radius:6px;
     cursor:pointer;
-    font-weight:bold;
+    margin-top:8px;
 }
 
 .fetch-btn{
-    background:var(--blue);
+    background:#2196f3;
     color:#fff;
 }
 
-.view-btn{
+.toggle-btn{
     background:#444;
     color:#fff;
 }
@@ -106,13 +92,13 @@ pre{
 
 select,input{
     padding:10px;
-    border-radius:6px;
     border:none;
+    border-radius:6px;
     background:#333;
     color:#fff;
 }
 
-.status{
+#status{
     margin-top:15px;
     color:#ffeb3b;
 }
@@ -124,70 +110,64 @@ select,input{
 
 <div class="container">
 
-<h1 style="text-align:center;color:var(--gold)">
-🎬 Doo-Nang Movie Explorer
+<h1>
+🎬 Doo-Nang Category Scraper
 </h1>
 
 <div class="control">
 
 <select id="category">
 
-<option value="movie">
-ภาพยนตร์
+<option value="ALL">
+ทั้งหมด
 </option>
 
-<option value="thai-movie">
-ภาพยนตร์ ไทย
+<option value="TH">
+ไทย
 </option>
 
-<option value="korean-movie">
-ภาพยนตร์ เกาหลี
+<option value="KR">
+เกาหลี
 </option>
 
-<option value="japanese-movie">
-ภาพยนตร์ ญี่ปุ่น
+<option value="JP">
+ญี่ปุ่น
 </option>
 
-<option value="indian-movie">
-ภาพยนตร์ อินเดีย
+<option value="IN">
+อินเดีย
 </option>
 
-<option value="cartoon-movie">
-ภาพยนตร์ การ์ตูน
+<option value="CN">
+จีน
 </option>
 
-<option value="historical-movie">
-หนังประวัติศาสตร์
+<option value="US">
+ฮอลลีวูด
 </option>
 
 </select>
 
 <input
 type="number"
-id="startPage"
-value="1"
-min="1">
+id="startId"
+value="1">
 
 <input
 type="number"
-id="endPage"
-value="1"
-min="1">
+id="endId"
+value="3000">
 
 <button
 class="fetch-btn"
-onclick="startHarvest()">
+onclick="startScraping()">
 
 🚀 เริ่มดึงข้อมูล
 
 </button>
 
-<div
-class="status"
-id="status">
-
+<div id="status">
 พร้อมทำงาน
-
 </div>
 
 </div>
@@ -201,138 +181,18 @@ class="grid">
 
 <script>
 
-// ===================================
-// CONFIG
-// ===================================
-
 const GRAPHQL =
 "https://api.doo-nang.com/graphql";
 
-const PROXY =
-"https://corsproxy.io/?";
+let allMovies = [];
 
 
-// ===================================
-// CATEGORY
-// ===================================
 
-const categoryMap = {
+// =============================
+// fetch movie
+// =============================
 
-movie:
-"https://www.doo-nang.com/ดูหนังออนไลน์/list?type=content&value=movies&title=ภาพยนตร์",
-
-"thai-movie":
-"https://www.doo-nang.com/ดูหนังออนไลน์/list?type=movie-tag&value=ไทย&title=ภาพยนตร์ ไทย",
-
-"korean-movie":
-"https://www.doo-nang.com/ดูหนังออนไลน์/list?type=movie-tag&value=เกาหลี",
-
-"japanese-movie":
-"https://www.doo-nang.com/ดูหนังออนไลน์/list?type=movie-tag&value=ญี่ปุ่น",
-
-"indian-movie":
-"https://www.doo-nang.com/ดูหนังออนไลน์/list?type=movie-tag&value=อินเดีย",
-
-"cartoon-movie":
-"https://www.doo-nang.com/ดูหนังออนไลน์/list?type=movie-tag&value=การ์ตูน",
-
-"historical-movie":
-"https://www.doo-nang.com/ดูหนังออนไลน์/list?type=movie-tag&value=ประวัติศาสตร์"
-
-};
-
-
-// ===================================
-// REQUEST
-// ===================================
-
-async function request(url){
-
-    try{
-
-        const res =
-        await fetch(
-            PROXY +
-            encodeURIComponent(url)
-        );
-
-        return await res.text();
-
-    }catch(e){
-
-        console.log(e);
-
-        return "";
-
-    }
-
-}
-
-
-// ===================================
-// PARSE PAGE
-// ===================================
-
-async function parsePage(url){
-
-    const html =
-    await request(url);
-
-    const doc =
-    new DOMParser()
-    .parseFromString(
-        html,
-        "text/html"
-    );
-
-    const links =
-    [
-        ...doc.querySelectorAll("a")
-    ];
-
-    const movieLinks =
-    links
-    .map(a => a.href)
-    .filter(href =>
-
-        href.includes("/ดูหนัง/")
-
-        &&
-
-        !href.includes("list?")
-
-    );
-
-    return [...new Set(movieLinks)];
-
-}
-
-
-// ===================================
-// FETCH MOVIE
-// ===================================
-
-async function fetchMovie(url){
-
-try{
-
-const html =
-await request(url);
-
-const match =
-html.match(
-/"id":(\d+),"titleTh"/
-);
-
-if(!match){
-
-console.log("NOT FOUND ID");
-
-return null;
-
-}
-
-const id = match[1];
+async function fetchMovie(id){
 
 const query = `
 
@@ -343,6 +203,7 @@ movie(id:$id){
 id
 titleTh
 titleEn
+nation
 synopsisTh
 posterUrl
 releaseDate
@@ -355,6 +216,8 @@ cdnHostname
 }
 }
 `;
+
+try{
 
 const res =
 await fetch(GRAPHQL,{
@@ -383,29 +246,22 @@ await res.json();
 const movie =
 json?.data?.movie;
 
-if(!movie){
-
-console.log("MOVIE NULL");
-
+if(!movie)
 return null;
-
-}
 
 const uuid =
 movie.video?.transcodeUuid;
 
-if(!uuid){
-
-console.log("NO VIDEO");
-
+if(!uuid)
 return null;
-
-}
 
 return {
 
 id:
 movie.id,
+
+nation:
+movie.nation,
 
 title:
 movie.titleTh ||
@@ -426,9 +282,7 @@ video:
 
 };
 
-}catch(e){
-
-console.log(e);
+}catch{
 
 return null;
 
@@ -437,129 +291,32 @@ return null;
 }
 
 
-// ===================================
-// START
-// ===================================
 
-async function startHarvest(){
+// =============================
+// generate m3u
+// =============================
 
-const category =
-document
-.getElementById("category")
-.value;
+function generateM3U(movie){
 
-const startPage =
-parseInt(
-document
-.getElementById("startPage")
-.value
-);
-
-const endPage =
-parseInt(
-document
-.getElementById("endPage")
-.value
-);
-
-const output =
-document
-.getElementById("output");
-
-const status =
-document
-.getElementById("status");
-
-output.innerHTML = "";
-
-let total = 0;
-
-for(
-let p = startPage;
-p <= endPage;
-p++
-){
-
-status.innerHTML =
-`🔍 กำลังสแกนหน้า ${p}`;
-
-let pageUrl =
-categoryMap[category];
-
-if(p > 1){
-
-pageUrl += `&page=${p}`;
-
-}
-
-const urls =
-await parsePage(pageUrl);
-
-console.log(urls);
-
-for(
-let i=0;
-i<urls.length;
-i++
-){
-
-status.innerHTML =
-
-`🎬 หน้า ${p}
-|
-เรื่อง ${i+1}/${urls.length}`;
-
-const movie =
-await fetchMovie(
-urls[i]
-);
-
-if(movie){
-
-renderMovie(movie,p);
-
-total++;
-
-}
-
-await new Promise(
-r=>setTimeout(r,100)
-);
-
-}
-
-}
-
-status.innerHTML =
-`✅ เสร็จสิ้น พบ ${total} เรื่อง`;
-
-}
-
-
-// ===================================
-// RENDER
-// ===================================
-
-function renderMovie(movie,page){
-
-const m3u =
-
-`#EXTM3U
+return `#EXTM3U
 
 #EXTINF:-1
 tvg-logo="${movie.poster}"
-group-title="Movies",
+group-title="${movie.nation}",
 
 ${movie.title}
 
 ${movie.video}`;
 
-const json =
-JSON.stringify(
-movie,
-null,
-2
-);
+}
+
+
+
+// =============================
+// render card
+// =============================
+
+function renderMovie(movie){
 
 const card =
 document.createElement("div");
@@ -573,42 +330,43 @@ card.innerHTML = `
 class="poster"
 src="${movie.poster}">
 
-<div class="card-body">
-
-<div class="meta">
-หน้า ${page}
-</div>
+<div class="body">
 
 <div class="title">
 ${movie.title}
 </div>
 
-<div class="meta">
+<div style="color:#aaa;font-size:12px;">
 ${movie.year}
+|
+${movie.nation}
 </div>
 
 <button
-class="view-btn"
+class="toggle-btn"
 onclick="toggleBox(this)">
 
-📂 แสดง M3U Playlist
+📂 M3U Playlist
 
 </button>
 
-<pre>${m3u}</pre>
+<pre>
+${generateM3U(movie)}
+</pre>
 
 <button
-class="view-btn"
+class="toggle-btn"
 onclick="toggleBox(this)">
 
-📦 แสดง JSON
+📦 JSON
 
 </button>
 
-<pre>${json}</pre>
+<pre>
+${JSON.stringify(movie,null,2)}
+</pre>
 
 </div>
-
 `;
 
 document
@@ -618,9 +376,10 @@ document
 }
 
 
-// ===================================
-// TOGGLE
-// ===================================
+
+// =============================
+// toggle
+// =============================
 
 function toggleBox(btn){
 
@@ -638,25 +397,145 @@ isOpen
 :
 "block";
 
-if(btn.textContent.includes("JSON")){
+}
 
-btn.textContent =
-isOpen
-?
-"📦 แสดง JSON"
-:
-"✖ ปิด JSON";
 
-}else{
 
-btn.textContent =
-isOpen
-?
-"📂 แสดง M3U Playlist"
-:
-"✖ ปิด Playlist";
+// =============================
+// start scraping
+// =============================
+
+async function startScraping(){
+
+allMovies = [];
+
+const category =
+document
+.getElementById("category")
+.value;
+
+const startId =
+parseInt(
+document
+.getElementById("startId")
+.value
+);
+
+const endId =
+parseInt(
+document
+.getElementById("endId")
+.value
+);
+
+const status =
+document
+.getElementById("status");
+
+const output =
+document
+.getElementById("output");
+
+output.innerHTML = "";
+
+let total = 0;
+
+for(
+let id=startId;
+id<=endId;
+id++
+){
+
+status.innerHTML =
+`🔍 กำลังดึง ID ${id}`;
+
+const movie =
+await fetchMovie(id);
+
+if(!movie){
+
+continue;
 
 }
+
+
+// ======================
+// FILTER CATEGORY
+// ======================
+
+if(
+category !== "ALL"
+&&
+movie.nation !== category
+){
+
+continue;
+
+}
+
+renderMovie(movie);
+
+allMovies.push(movie);
+
+total++;
+
+await new Promise(
+r=>setTimeout(r,120)
+);
+
+}
+
+status.innerHTML =
+`✅ พบ ${total} เรื่อง`;
+
+downloadM3U();
+
+}
+
+
+
+// =============================
+// download
+// =============================
+
+function downloadM3U(){
+
+let m3u =
+"#EXTM3U\n";
+
+allMovies.forEach(movie=>{
+
+m3u +=
+
+`#EXTINF:-1
+tvg-logo="${movie.poster}"
+group-title="${movie.nation}",
+
+${movie.title}
+
+${movie.video}
+
+`;
+
+});
+
+const blob =
+new Blob([m3u],{
+type:"text/plain"
+});
+
+const url =
+URL.createObjectURL(blob);
+
+const a =
+document.createElement("a");
+
+a.href = url;
+
+a.download =
+"doo-nang-category.m3u";
+
+a.click();
 
 }
 
@@ -664,4 +543,4 @@ isOpen
 
 </body>
 </html>
-
+```
