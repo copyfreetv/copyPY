@@ -157,29 +157,12 @@ async function fetchHtml(url){
 function findM3U8(html){
 
   // ====================================
-  // DIRECT
+  // DIRECT NEWPLAYLIST
   // ====================================
 
   let match =
   html.match(
 /https?:\/\/main\.24playerhd\.com\/newplaylist\/[^"' ]+\.m3u8/gi
-  );
-
-  if(match && match.length){
-
-    return match[0];
-
-  }
-
-
-
-  // ====================================
-  // INDEX_TH
-  // ====================================
-
-  match =
-  html.match(
-/https?:\/\/main\.24playerhd\.com\/index_th\.php\?id=[^"' ]+/gi
   );
 
   if(match && match.length){
@@ -203,6 +186,23 @@ function findM3U8(html){
 
     return match[0]
     .replaceAll("\\/","/");
+
+  }
+
+
+
+  // ====================================
+  // INDEX_TH
+  // ====================================
+
+  match =
+  html.match(
+/https?:\/\/main\.24playerhd\.com\/index_th\.php\?id=[^"' ]+/gi
+  );
+
+  if(match && match.length){
+
+    return match[0];
 
   }
 
@@ -291,6 +291,10 @@ async function parseSeries(url){
 
   const episodes = [];
 
+  const used =
+  new Set();
+
+
 
 
   // ====================================
@@ -314,12 +318,25 @@ async function parseSeries(url){
     if(!href) continue;
 
     if(
-      !text.includes("EP")
+      !href.includes("episode")
       &&
-      !text.includes("ตอน")
+      !href.includes("-ep-")
     ){
       continue;
     }
+
+
+
+    // =================================
+    // DUPLICATE
+    // =================================
+
+    if(used.has(href)){
+      continue;
+    }
+
+    used.add(href);
+
 
 
 
@@ -329,6 +346,13 @@ async function parseSeries(url){
       .getElementById("loading")
       .innerText =
       "กำลังดึง " + text;
+
+
+
+      console.log(
+        "episode:",
+        href
+      );
 
 
 
@@ -398,7 +422,6 @@ async function parseSeries(url){
         iframeUrl
       );
 
-      console.log(playerHtml);
 
 
       console.log(
@@ -431,7 +454,7 @@ async function parseSeries(url){
 
       episodes.push({
 
-        name:text,
+        name:text || href,
 
         image:image,
 
