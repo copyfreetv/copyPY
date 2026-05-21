@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
@@ -10,70 +9,79 @@
 <style>
 
 body{
-  background:#111;
-  color:#fff;
-  font-family:Arial;
-  margin:0;
-  padding:20px;
+    background:#0f0f0f;
+    color:#fff;
+    font-family:Arial;
+    margin:0;
+    padding:20px;
 }
 
 .container{
-  max-width:1200px;
-  margin:auto;
+    max-width:1200px;
+    margin:auto;
+}
+
+h1{
+    color:#63ff00;
 }
 
 input{
-  width:100%;
-  padding:14px;
-  background:#1f1f1f;
-  border:1px solid #333;
-  color:#fff;
-  border-radius:10px;
-  margin-bottom:15px;
-  font-size:16px;
+    width:100%;
+    padding:14px;
+    background:#1a1a1a;
+    border:1px solid #333;
+    border-radius:12px;
+    color:#fff;
+    font-size:16px;
+    margin-bottom:15px;
+    box-sizing:border-box;
 }
 
 button{
-  padding:14px 24px;
-  border:none;
-  border-radius:10px;
-  background:#63ff00;
-  color:#000;
-  font-weight:bold;
-  cursor:pointer;
-  font-size:16px;
+    background:#63ff00;
+    color:#000;
+    border:none;
+    padding:14px 25px;
+    border-radius:12px;
+    font-weight:bold;
+    cursor:pointer;
+    font-size:16px;
 }
 
 button:hover{
-  opacity:.9;
+    opacity:.9;
 }
 
 .card{
-  background:#1a1a1a;
-  padding:20px;
-  border-radius:15px;
-  margin-top:20px;
+    background:#181818;
+    border-radius:18px;
+    padding:20px;
+    margin-top:20px;
 }
 
 pre{
-  background:#000;
-  color:#63ff00;
-  padding:15px;
-  border-radius:10px;
-  overflow:auto;
-  margin-top:20px;
-  max-height:700px;
-  white-space:pre-wrap;
+    background:#000;
+    color:#63ff00;
+    padding:15px;
+    border-radius:12px;
+    overflow:auto;
+    max-height:600px;
+    white-space:pre-wrap;
+    word-break:break-word;
 }
 
-.loading{
-  color:#63ff00;
-  margin-top:20px;
-  font-size:18px;
+.poster{
+    width:220px;
+    border-radius:15px;
+    margin-top:15px;
+}
+
+.status{
+    margin-top:15px;
+    color:#63ff00;
 }
 
 </style>
-
 </head>
 
 <body>
@@ -84,14 +92,26 @@ pre{
 
 <input
 id="url"
-placeholder="https://www.123-hds.com/zhan-zhao-adventures/"
+placeholder="วางลิงค์ เช่น https://www.123-hds.com/zhan-zhao-adventures/"
 >
 
 <button onclick="startFetch()">
 ดึงข้อมูล
 </button>
 
-<div class="loading" id="loading"></div>
+<div class="status" id="status"></div>
+
+<div class="card">
+
+<h2>Poster</h2>
+
+<img
+id="poster"
+class="poster"
+src=""
+>
+
+</div>
 
 <div class="card">
 
@@ -113,509 +133,440 @@ placeholder="https://www.123-hds.com/zhan-zhao-adventures/"
 
 <script>
 
-// ========================================
-// PROXY
-// ========================================
-
-const PROXY =
-"/api/proxy?url=";
-
-
-
-// ========================================
-// FETCH HTML
-// ========================================
+// =========================================
+// FETCH HTML ผ่าน proxy
+// =========================================
 
 async function fetchHtml(url){
 
-  try{
+    const proxy =
+    "/api/proxy?url=" +
+    encodeURIComponent(url);
 
     const res =
-    await fetch(
-      PROXY +
-      encodeURIComponent(url)
-    );
+    await fetch(proxy);
 
     return await res.text();
 
-  }catch(err){
-
-    console.log(err);
-
-    return "";
-
-  }
-
 }
 
 
 
-// ========================================
-// FIND M3U8
-// ========================================
+// =========================================
+// หา m3u8
+// =========================================
 
 function findM3U8(html){
 
-  // ====================================
-  // DIRECT NEWPLAYLIST
-  // ====================================
+    const patterns = [
 
-  let match =
-  html.match(
-/https?:\/\/main\.24playerhd\.com\/newplaylist\/[^"' ]+\.m3u8/gi
-  );
+        /https?:\/\/main\.24playerhd\.com\/newplaylist\/[^"' ]+\.m3u8[^"' ]*/gi,
 
-  if(match && match.length){
+        /https?:\/\/[^"' ]+\.m3u8[^"' ]*/gi
 
-    return match[0];
+    ];
 
-  }
+    for(const reg of patterns){
 
+        const match =
+        html.match(reg);
 
+        if(match && match.length){
 
-  // ====================================
-  // ESCAPED
-  // ====================================
+            return match[0];
 
-  match =
-  html.match(
-/https?:\\\/\\\/main\.24playerhd\.com\\\/newplaylist\\\/[^"]+\.m3u8/gi
-  );
+        }
 
-  if(match && match.length){
+    }
 
-    return match[0]
-    .replaceAll("\\/","/");
-
-  }
-
-
-
-  // ====================================
-  // INDEX_TH
-  // ====================================
-
-  match =
-  html.match(
-/https?:\/\/main\.24playerhd\.com\/index_th\.php\?id=[^"' ]+/gi
-  );
-
-  if(match && match.length){
-
-    return match[0];
-
-  }
-
-  return "";
+    return "";
 
 }
 
 
 
-// ========================================
+// =========================================
 // PARSE SERIES
-// ========================================
+// =========================================
 
 async function parseSeries(url){
 
-  // ====================================
-  // SERIES PAGE
-  // ====================================
-
-  const html =
-  await fetchHtml(url);
-
-  const parser =
-  new DOMParser();
-
-  const doc =
-  parser.parseFromString(
-    html,
-    "text/html"
-  );
+    document.getElementById(
+        "status"
+    ).innerText =
+    "กำลังโหลด...";
 
 
 
-  // ====================================
-  // TITLE
-  // ====================================
+    // =====================================
+    // โหลดหน้า series
+    // =====================================
 
-  let title =
-  doc.querySelector(".entry-title")?.innerText
-  ||
-  doc.querySelector("h1")?.innerText
-  ||
-  document.title
-  ||
-  "Unknown";
+    const html =
+    await fetchHtml(url);
 
+    console.log(html);
 
+    const parser =
+    new DOMParser();
 
-  title =
-  title
-  .replace("ดูซีรี่ย์ออนไลน์","")
-  .replace("- 123-HD.COM","")
-  .trim();
+    const doc =
+    parser.parseFromString(
+        html,
+        "text/html"
+    );
 
 
 
+    // =====================================
+    // TITLE
+    // =====================================
 
-  // ====================================
-  // IMAGE
-  // ====================================
-
-  let image = "";
-
-  const poster =
-  doc.querySelector(
-    'meta[property="og:image"]'
-  );
-
-  if(poster){
-
-    image =
-    poster.content;
-
-  }
+    const title =
+    doc.querySelector("h1")?.innerText
+    ||
+    document.title
+    ||
+    "Unknown";
 
 
 
-  // ====================================
-  // LINKS
-  // ====================================
+    // =====================================
+    // POSTER
+    // =====================================
 
-  const links =
-  [...doc.querySelectorAll("a")];
+    let image = "";
 
+    const poster =
+    doc.querySelector(
+        'meta[property="og:image"]'
+    );
 
+    if(poster){
 
-  const episodes = [];
+        image =
+        poster.content;
 
-  const used =
-  new Set();
-
-
-
-
-  // ====================================
-  // LOOP
-  // ====================================
-
-  for(const a of links){
-
-    const href =
-    a.href;
-
-    const text =
-    a.innerText.trim();
-
-
-
-    // =================================
-    // FILTER
-    // =================================
-
-    if(!href) continue;
-
-    if(
-      !href.includes("episode")
-      &&
-      !href.includes("-ep-")
-    ){
-      continue;
     }
 
 
 
-    // =================================
-    // DUPLICATE
-    // =================================
+    // =====================================
+    // หา episode links
+    // =====================================
 
-    if(used.has(href)){
-      continue;
+    const episodesLinks = [];
+
+    doc.querySelectorAll("a").forEach(a=>{
+
+        const href =
+        a.href || "";
+
+        const text =
+        a.innerText.trim();
+
+        if(
+            href.includes("-ep-")
+            ||
+            text.includes("EP")
+            ||
+            text.includes("ตอน")
+        ){
+
+            episodesLinks.push({
+
+                href,
+                text
+
+            });
+
+        }
+
+    });
+
+
+
+    // =====================================
+    // ลบซ้ำ
+    // =====================================
+
+    const uniqueEpisodes =
+    [];
+
+    const used =
+    new Set();
+
+    episodesLinks.forEach(ep=>{
+
+        if(!used.has(ep.href)){
+
+            used.add(ep.href);
+
+            uniqueEpisodes.push(ep);
+
+        }
+
+    });
+
+
+
+    console.log(uniqueEpisodes);
+
+
+
+    // =====================================
+    // stations
+    // =====================================
+
+    const stations = [];
+
+
+
+    for(const ep of uniqueEpisodes){
+
+        try{
+
+            console.log(
+                "OPEN EP:",
+                ep.href
+            );
+
+
+
+            // ==============================
+            // โหลดหน้า EP
+            // ==============================
+
+            const epHtml =
+            await fetchHtml(
+                ep.href
+            );
+
+
+
+            console.log(epHtml);
+
+
+
+            // ==============================
+            // หา m3u8
+            // ==============================
+
+            let m3u8 =
+            findM3U8(epHtml);
+
+
+
+            // ==============================
+            // ถ้าไม่เจอ
+            // หา iframe
+            // ==============================
+
+            if(!m3u8){
+
+                const epDoc =
+                parser.parseFromString(
+                    epHtml,
+                    "text/html"
+                );
+
+                const iframe =
+                epDoc.querySelector(
+                    "iframe"
+                );
+
+
+
+                if(iframe){
+
+                    console.log(
+                        "IFRAME:",
+                        iframe.src
+                    );
+
+
+
+                    const iframeHtml =
+                    await fetchHtml(
+                        iframe.src
+                    );
+
+
+
+                    console.log(
+                        iframeHtml
+                    );
+
+
+
+                    m3u8 =
+                    findM3U8(
+                        iframeHtml
+                    );
+
+                }
+
+            }
+
+
+
+            console.log(
+                "FOUND:",
+                m3u8
+            );
+
+
+
+            stations.push({
+
+                name:
+                ep.text,
+
+                image:
+                image,
+
+                url:
+                m3u8,
+
+                referer:
+                "https://www.123-hds.com/",
+
+                info:
+                "HD | พากย์ไทย",
+
+                playInNatPlayer:
+                "true"
+
+            });
+
+
+
+        }catch(err){
+
+            console.log(err);
+
+        }
+
     }
 
-    used.add(href);
 
+
+    return {
+
+        name:title,
+
+        image:image,
+
+        stations:stations
+
+    };
+
+}
+
+
+
+// =========================================
+// BUILD M3U
+// =========================================
+
+function buildM3U(data){
+
+    let m3u =
+    "#EXTM3U\n\n";
+
+
+
+    data.stations.forEach(st=>{
+
+        m3u +=
+
+`#EXTINF:-1 tvg-logo="${st.image}" group-title="${data.name}",${st.name}
+#EXTVLCOPT:http-referrer=https://www.123-hds.com/
+#EXTVLCOPT:http-user-agent=Mozilla/5.0
+${st.url}
+
+`;
+
+    });
+
+
+
+    return m3u;
+
+}
+
+
+
+// =========================================
+// START
+// =========================================
+
+async function startFetch(){
+
+    const url =
+    document
+    .getElementById("url")
+    .value
+    .trim();
+
+
+
+    if(!url){
+
+        alert("ใส่ URL");
+
+        return;
+
+    }
 
 
 
     try{
 
-      document
-      .getElementById("loading")
-      .innerText =
-      "กำลังดึง " + text;
+        const data =
+        await parseSeries(url);
 
 
 
-      console.log(
-        "episode:",
-        href
-      );
+        document
+        .getElementById("poster")
+        .src =
+        data.image;
 
 
 
-      // ================================
-      // EPISODE PAGE
-      // ================================
-
-      const epHtml =
-      await fetchHtml(href);
-
-      const epDoc =
-      parser.parseFromString(
-        epHtml,
-        "text/html"
-      );
-
-
-
-      // ================================
-      // FIND IFRAME
-      // ================================
-
-      const iframe =
-      epDoc.querySelector("iframe")
-      ||
-      epDoc.querySelector(
-        ".embed-responsive iframe"
-      );
-
-
-
-      if(!iframe){
-
-        console.log(
-          "ไม่เจอ iframe",
-          href
+        document
+        .getElementById("json")
+        .textContent =
+        JSON.stringify(
+            data,
+            null,
+            2
         );
 
-        continue;
-
-      }
 
 
-
-      // ================================
-      // IFRAME URL
-      // ================================
-
-      const iframeUrl =
-      iframe.src;
+        document
+        .getElementById("m3u")
+        .textContent =
+        buildM3U(data);
 
 
 
-      console.log(
-        "iframe:",
-        iframeUrl
-      );
-
-
-
-      // ================================
-      // FETCH PLAYER
-      // ================================
-
-      const playerHtml =
-      await fetchHtml(
-        iframeUrl
-      );
-
-
-
-      console.log(
-        playerHtml
-      );
-
-
-
-      // ================================
-      // FIND M3U8
-      // ================================
-
-      const m3u8 =
-      findM3U8(
-        playerHtml
-      );
-
-
-
-      console.log(
-        "m3u8:",
-        m3u8
-      );
-
-
-
-      // ================================
-      // PUSH
-      // ================================
-
-      episodes.push({
-
-        name:text || href,
-
-        image:image,
-
-        url:m3u8,
-
-        referer:
-        "https://www.123-hds.com/",
-
-        info:
-        "HD | พากย์ไทย",
-
-        playInNatPlayer:
-        "true"
-
-      });
+        document
+        .getElementById("status")
+        .innerText =
+        "โหลดเสร็จ";
 
 
 
     }catch(err){
 
-      console.log(err);
+        console.log(err);
+
+        alert(err.message);
 
     }
-
-  }
-
-
-
-  // ====================================
-  // RETURN
-  // ====================================
-
-  return {
-
-    name:title,
-
-    image:image,
-
-    stations:episodes
-
-  };
-
-}
-
-
-
-// ========================================
-// BUILD M3U
-// ========================================
-
-function buildM3U(data){
-
-  let m3u =
-  "#EXTM3U\n\n";
-
-
-
-  data.stations.forEach(st=>{
-
-    m3u +=
-
-`#EXTINF:-1 tvg-logo="${st.image}" group-title="${data.name}",${st.name}
-#EXTVLCOPT:http-referrer=https://www.123-hds.com/
-${st.url}
-
-`;
-
-  });
-
-
-
-  return m3u;
-
-}
-
-
-
-// ========================================
-// START
-// ========================================
-
-async function startFetch(){
-
-  const url =
-  document
-  .getElementById("url")
-  .value
-  .trim();
-
-
-
-  if(!url){
-
-    alert("ใส่ URL");
-
-    return;
-
-  }
-
-
-
-  document
-  .getElementById("loading")
-  .innerText =
-  "กำลังโหลด...";
-
-
-
-  document
-  .getElementById("json")
-  .textContent =
-  "";
-
-
-
-  document
-  .getElementById("m3u")
-  .textContent =
-  "";
-
-
-
-  try{
-
-    const data =
-    await parseSeries(url);
-
-
-
-    document
-    .getElementById("json")
-    .textContent =
-    JSON.stringify(
-      data,
-      null,
-      2
-    );
-
-
-
-    document
-    .getElementById("m3u")
-    .textContent =
-    buildM3U(data);
-
-
-
-    document
-    .getElementById("loading")
-    .innerText =
-    "โหลดเสร็จ";
-
-
-
-  }catch(err){
-
-    console.log(err);
-
-    alert(err.message);
-
-  }
 
 }
 
