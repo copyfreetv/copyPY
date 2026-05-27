@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>EZMovie Scraper Pro</title>
+
+<style>
+
+:root{
+  --bg:#0f0f0f;
+  --card:#1e1e1e;
+  --blue:#2196F3;
+  --gold:#ffeb3b;
+}
+
+body{
+  background:var(--bg);
+  color:#fff;
+  font-family:tahoma;
+  padding:20px;
+}
+
+.container{
+  max-width:1400px;
+  margin:auto;
+}
+
+h1{
+  text-align:center;
+  color:var(--gold);
+}
+
+.control-panel{
+  background:#222;
+  padding:20px;
+  border-radius:12px;
+  margin-bottom:20px;
+}
+
+.input-group{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  align-items:center;
+}
+
+input,
+select{
+  background:#333;
+  border:1px solid #444;
+  color:#fff;
+  padding:10px;
+  border-radius:6px;
+}
+
+button{
+  background:var(--blue);
+  border:none;
+  color:#fff;
+  padding:10px 20px;
+  border-radius:6px;
+  cursor:pointer;
+  font-weight:bold;
+}
+
+.status-box{
+  margin-top:15px;
+  background:#111;
+  padding:15px;
+  border-radius:8px;
+}
+
+.grid{
+  display:grid;
+  grid-template-columns:
+  repeat(auto-fill,minmax(320px,1fr));
+  gap:20px;
+}
+
+.card{
+  background:var(--card);
+  border-radius:12px;
+  overflow:hidden;
+  border:1px solid #333;
+}
+
+.card img{
+  width:100%;
+  height:220px;
+  object-fit:cover;
+}
+
+.card-body{
+  padding:15px;
+}
+
+.card-title{
+  color:var(--gold);
+  font-size:16px;
+  font-weight:bold;
+  margin-bottom:10px;
+}
+
+.badge{
+  display:inline-block;
+  background:var(--blue);
+  padding:4px 8px;
+  border-radius:4px;
+  font-size:11px;
+  margin-bottom:10px;
+}
+
+pre{
+  background:#000;
+  color:#00ff90;
+  padding:10px;
+  overflow:auto;
+  max-height:250px;
+  display:none;
+  border-radius:6px;
+  font-size:11px;
+}
+
+.view-btn{
+  width:100%;
+  margin-top:10px;
+  background:#444;
+}
+
+.json-btn{
+  background:#009688;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>
+EZMovie Scraper Pro
+</h1>
+
+<div class="control-panel">
+
+<div class="input-group">
+
+<label>ประเภท:</label>
+
+<select id="type">
+<option value="movie">
+หนัง
+</option>
+
+<option value="series">
+ซีรีย์
+</option>
+</select>
+
+<label>เริ่มหน้า:</label>
+
+<input
+type="number"
+id="startPage"
+value="1"
+min="1"
+>
+
+<label>ถึงหน้า:</label>
+
+<input
+type="number"
+id="endPage"
+value="1"
+min="1"
+>
+
+<button onclick="startHarvesting()">
+🚀 เริ่มดึงข้อมูล
+</button>
+
+</div>
+
+<div class="status-box">
+
+<div id="loader">
+📍 พร้อมเริ่ม
+</div>
+
+<div
+id="stats"
+style="
+margin-top:5px;
+font-size:13px;
+color:#aaa;
+"
+></div>
+
+</div>
+
+</div>
+
+<div
+id="output"
+class="grid"
+></div>
+
+</div>
+
+<script>
+
+const PROXY =
+"/api/proxy-ezmovie?url=";
+
+const BASE = {
+  movie:
+  "https://ezmovie.movie/movie/page/",
+
+  series:
+  "https://ezmovie.movie/series/page/"
+};
+
+async function request(url){
+
+  try{
+
+    const res = await fetch(
+      PROXY +
+      encodeURIComponent(url)
+    );
+
+    if(!res.ok){
+      return null;
+    }
+
+    return await res.text();
+
+  }catch(e){
+
+    return null;
+
+  }
+}
+
+async function extractStream(url){
+
+  const html =
+    await request(url);
+
+  if(!html){
+    return null;
+  }
+
+  // หา iframe
+  const iframeMatch =
+    html.match(
+      /<iframe[^>]+src="([^"]+)"/i
+    );
+
+  if(!iframeMatch){
+    return null;
+  }
+
+  const iframeUrl =
+    iframeMatch[1];
+
+  // โหลด iframe
+  const iframeHtml =
+    await request(iframeUrl);
+
+  if(!iframeHtml){
+    return null;
+  }
+
+  // หา m3u8
+  const m3u8Patterns = [
+
+    /https?:\/\/[^"' ]+\.m3u8[^"' ]*/i,
+
+    /file:\s*"([^"]+\.m3u8[^"]*)"/i,
+
+    /source:\s*"([^"]+\.m3u8[^"]*)"/i
+
+  ];
+
+  for(const pattern of m3u8Patterns){
+
+    const match =
+      iframeHtml.match(pattern);
+
+    if(match){
+
+      return match[1] || match[0];
+
+    }
+  }
+
+  return null;
+}
+
+async function parsePage(page,type){
+
+  const url =
+    BASE[type] + page + "/";
+
+  const html =
+    await request(url);
+
+  if(!html){
+    return [];
+  }
+
+  const regex =
+    /href="(https:\/\/ezmovie\.movie\/(movie|series)\/[^"]+)"/g;
+
+  const matches =
+    [...html.matchAll(regex)];
+
+  const unique =
+    [...new Set(
+      matches.map(m => m[1])
+    )];
+
+  return unique;
+}
+
+async function parseMovie(url){
+
+  const html =
+    await request(url);
+
+  if(!html){
+    return null;
+  }
+
+  const doc =
+    new DOMParser()
+    .parseFromString(
+      html,
+      "text/html"
+    );
+
+  const title =
+    doc.querySelector("title")
+    ?.textContent
+    ?.trim();
+
+  const poster =
+    doc.querySelector("img")
+    ?.src;
+
+  const stream =
+    await extractStream(url);
+
+  if(!stream){
+    return null;
+  }
+
+  return {
+    title,
+    poster,
+    stream,
+    url
+  };
+}
+
+async function startHarvesting(){
+
+  const type =
+    document
+    .getElementById("type")
+    .value;
+
+  const startPage =
+    parseInt(
+      document
+      .getElementById("startPage")
+      .value
+    );
+
+  const endPage =
+    parseInt(
+      document
+      .getElementById("endPage")
+      .value
+    );
+
+  const output =
+    document
+    .getElementById("output");
+
+  const loader =
+    document
+    .getElementById("loader");
+
+  const stats =
+    document
+    .getElementById("stats");
+
+  output.innerHTML = "";
+
+  let total = 0;
+
+  for(
+    let page = startPage;
+    page <= endPage;
+    page++
+  ){
+
+    loader.textContent =
+      `🔍 กำลังสแกนหน้า ${page}`;
+
+    const urls =
+      await parsePage(
+        page,
+        type
+      );
+
+    stats.textContent =
+      `พบ ${urls.length} รายการ`;
+
+    total += urls.length;
+
+    for(
+      let i = 0;
+      i < urls.length;
+      i++
+    ){
+
+      loader.textContent =
+        `⏳ ${i+1}/${urls.length}`;
+
+      const data =
+        await parseMovie(
+          urls[i]
+        );
+
+      if(data){
+
+        renderCard(
+          data,
+          page,
+          type
+        );
+
+      }
+    }
+  }
+
+  loader.textContent =
+    `✅ เสร็จสิ้น ${total} รายการ`;
+}
+
+function renderCard(
+  data,
+  page,
+  type
+){
+
+  const m3u =
+`#EXTM3U
+
+#EXTINF:-1 tvg-logo="${data.poster}" group-title="${type}",${data.title}
+${data.stream}
+`;
+
+  const json =
+JSON.stringify({
+  title:data.title,
+  poster:data.poster,
+  stream:data.stream,
+  type:type,
+  url:data.url
+},null,2);
+
+  const card =
+    document.createElement("div");
+
+  card.className =
+    "card";
+
+  card.innerHTML = `
+
+<img src="${data.poster}">
+
+<div class="card-body">
+
+<span class="badge">
+${type.toUpperCase()}
+</span>
+
+<div class="card-title">
+${data.title}
+</div>
+
+<div
+style="
+font-size:12px;
+color:#aaa;
+word-break:break-all;
+"
+>
+${data.stream}
+</div>
+
+<button
+class="view-btn"
+onclick="toggle(this)"
+>
+📂 แสดง M3U
+</button>
+
+<pre>${m3u}</pre>
+
+<button
+class="view-btn json-btn"
+onclick="toggle(this)"
+>
+📂 แสดง JSON
+</button>
+
+<pre>${json}</pre>
+
+</div>
+`;
+
+  document
+  .getElementById("output")
+  .appendChild(card);
+}
+
+function toggle(btn){
+
+  const pre =
+    btn.nextElementSibling;
+
+  pre.style.display =
+    pre.style.display === "block"
+    ? "none"
+    : "block";
+
+}
+
+</script>
+
+</body>
+</html>
