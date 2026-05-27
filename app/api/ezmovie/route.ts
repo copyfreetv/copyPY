@@ -1,8 +1,14 @@
-import { NextRequest, NextResponse } from "next/server";
+import {
+  NextRequest,
+  NextResponse
+} from "next/server";
 
-export const dynamic = "force-dynamic";
+export const dynamic =
+  "force-dynamic";
 
-export async function GET(request: NextRequest) {
+export async function GET(
+  request: NextRequest
+) {
 
   const { searchParams } =
     new URL(request.url);
@@ -49,7 +55,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Forbidden target domain"
+            "Forbidden host"
         },
         {
           status: 403
@@ -90,20 +96,6 @@ export async function GET(request: NextRequest) {
         "content-type"
       ) || "";
 
-    if (
-      contentType.includes(
-        "application/json"
-      )
-    ) {
-
-      const data =
-        await response.json();
-
-      return NextResponse.json(
-        data
-      );
-    }
-
     const text =
       await response.text();
 
@@ -113,19 +105,18 @@ export async function GET(request: NextRequest) {
         headers: {
           "Content-Type":
             contentType,
-
           "Access-Control-Allow-Origin":
             "*",
         },
       }
     );
 
-  } catch (error: any) {
+  } catch (e: any) {
 
     return NextResponse.json(
       {
         error:
-          error.message
+          e.message
       },
       {
         status: 500
