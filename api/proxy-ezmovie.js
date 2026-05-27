@@ -1,76 +1,122 @@
-import { NextRequest } from "next/server";
+export const config = {
+  runtime: 'edge',
+};
 
-export const dynamic = "force-dynamic";
-
-const ALLOWED = [
-  "ezmovie.movie",
-  "stream25.com",
-];
-
-export async function GET(
-  req: NextRequest
-) {
-  const url =
-    req.nextUrl.searchParams.get("url");
-
-  if (!url) {
-    return Response.json(
-      { error: "missing url" },
-      { status: 400 }
-    );
-  }
+export default async function(req) {
 
   try {
+
+    const url =
+      new URL(req.url)
+      .searchParams
+      .get("url");
+
+    if (!url) {
+
+      return new Response(
+        JSON.stringify({
+          error: "missing url"
+        }),
+        {
+          status: 400,
+          headers: {
+            "content-type":
+              "application/json"
+          }
+        }
+      );
+    }
+
     const target =
       new URL(url);
 
     const allowed =
-      ALLOWED.includes(
-        target.hostname
-      ) ||
+      target.hostname ===
+      "ezmovie.movie" ||
+
       target.hostname.endsWith(
         ".ezmovie.movie"
       ) ||
+
       target.hostname.endsWith(
         ".stream25.com"
       );
 
     if (!allowed) {
-      return Response.json(
-        { error: "forbidden host" },
-        { status: 403 }
+
+      return new Response(
+        JSON.stringify({
+          error:
+            "forbidden host"
+        }),
+        {
+          status: 403,
+          headers: {
+            "content-type":
+              "application/json"
+          }
+        }
       );
     }
 
     const response =
       await fetch(url, {
+
+        method: "GET",
+
         headers: {
+
           "user-agent":
             "Mozilla/5.0",
+
           referer:
             "https://ezmovie.movie/",
-        },
-        cache: "no-store",
+
+          accept:
+            "*/*"
+
+        }
+
       });
 
     return new Response(
       response.body,
       {
-        status: response.status,
+
+        status:
+          response.status,
+
         headers: {
+
           "content-type":
             response.headers.get(
               "content-type"
-            ) || "text/html",
+            ) ||
+            "text/html",
+
           "access-control-allow-origin":
-            "*",
-        },
+            "*"
+
+        }
+
       }
     );
-  } catch (e: any) {
-    return Response.json(
-      { error: e.message },
-      { status: 500 }
+
+  } catch (e) {
+
+    return new Response(
+      JSON.stringify({
+        error:
+          e.toString()
+      }),
+      {
+        status: 500,
+        headers: {
+          "content-type":
+            "application/json"
+        }
+      }
     );
+
   }
 }
