@@ -1,9 +1,20 @@
+<div align="center">
+<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
+</div>
+
+# Run and deploy your AI Studio app
+
+This contains everything you need to run your app locally.
+
+View your app in AI Studio: https://ai.studio/apps/21bd7b1a-d209-49af-a7db-37ff10c0d510
+
+## Run Locally
+
+**Prerequisites:**  Node.js
 
 
-<img width="1280" height="720" alt="71508" src="https://github.com/user-attachments/assets/6e0e2120-35c6-4c20-a23b-6315dc1491ac" />
-🔗https://py-weld.vercel.app/k24hd-js.html
-🌐🔗ดึงลิงคจากเว๊บ ดูหนัง
-<img width="1280" height="720" alt="70221" src="https://github.com/user-attachments/assets/57364fb3-8aca-4545-b9ce-8e945e5370a3" />
-🔗https://pythontv.pages.dev/doo
-
-link: https://py-weld.vercel.app/live/ch.m3u8
+1. Install dependencies:
+   `npm install`
+2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+3. Run the app:
+   `npm run dev`
